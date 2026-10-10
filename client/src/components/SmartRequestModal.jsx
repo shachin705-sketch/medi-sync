@@ -1,5 +1,44 @@
 import { useState, useMemo } from 'react';
-import { X, ShieldCheck, Truck, AlertTriangle, ArrowRight, CheckCircle2, Clock } from 'lucide-react';
+import { X, ShieldCheck, Truck, AlertTriangle, ArrowRight, CheckCircle2, Clock, Building2, AlertCircle } from 'lucide-react';
+
+const WAREHOUSE_MAPPING = {
+  Madurai: {
+    id: 'wh-madurai',
+    code: 'DDW-MDU',
+    name: 'Madurai District Drug Warehouse',
+    label: 'Madurai District Drug Warehouse (Simulated)',
+    district: 'Madurai',
+    stock: 2120,
+    usage: 0,
+    distance: 12.5,
+    time: 25,
+    is_warehouse: true
+  },
+  Theni: {
+    id: 'wh-theni',
+    code: 'DDW-THN',
+    name: 'Theni District Drug Warehouse',
+    label: 'Theni District Drug Warehouse (Simulated)',
+    district: 'Theni',
+    stock: 2072,
+    usage: 0,
+    distance: 14.0,
+    time: 30,
+    is_warehouse: true
+  },
+  Dindigul: {
+    id: 'wh-dindigul',
+    code: 'DDW-DGL',
+    name: 'Dindigul District Drug Warehouse',
+    label: 'Dindigul District Drug Warehouse (Simulated)',
+    district: 'Dindigul',
+    stock: 2258,
+    usage: 0,
+    distance: 15.0,
+    time: 28,
+    is_warehouse: true
+  }
+};
 
 export default function SmartRequestModal({
   receiverCentre,
@@ -14,19 +53,23 @@ export default function SmartRequestModal({
   const [urgency, setUrgency] = useState('High');
   const [selectedDonorCode, setSelectedDonorCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [isEscalatedToWarehouse, setIsEscalatedToWarehouse] = useState(false);
 
-  // Evaluate candidate donors protecting safety reserves:
-  // Transferable Surplus = Donor Current Stock - (Daily Usage * 14 days minimum safety buffer)
+  const receiverDistrict = receiverCentre?.district || 'Madurai';
+  const districtWarehouse = WAREHOUSE_MAPPING[receiverDistrict] || WAREHOUSE_MAPPING['Madurai'];
+
+  // Section 5: Donor ranking:
+  // Same-district peer centres first, then other districts, then district warehouse, then escalate.
   const donorCandidates = useMemo(() => {
-    return centres
+    // 1. Peer centres
+    const evaluatedPeers = centres
       .filter((c) => c.code !== receiverCentre?.code)
       .map((c) => {
-        const safetyReserve = c.usage * 14;
-        const safeTransferableSurplus = Math.max(0, c.stock - safetyReserve);
+        const safetyReserve = (c.usage || 5) * 14;
+        const safeTransferableSurplus = Math.max(0, (c.stock || 0) - safetyReserve);
         const canFulfill = safeTransferableSurplus >= requestedQty;
         const partialFulfill = safeTransferableSurplus > 0 && safeTransferableSurplus < requestedQty;
-
-        // FEFO calculation: check batch expiry
+        const isSameDistrict = c.district === receiverDistrict;
         const isNearExpiry = c.expiry && c.expiry.startsWith('2026');
 
         return {
@@ -35,25 +78,57 @@ export default function SmartRequestModal({
           safeTransferableSurplus,
           canFulfill,
           partialFulfill,
+          isSameDistrict,
           isNearExpiry,
-          fefoScore: isNearExpiry ? 95 : 75
+          fefoScore: isNearExpiry ? 95 : 75,
+          is_warehouse: false
         };
-      })
-      .sort((a, b) => {
-        // Sort by full fulfillment first, then FEFO priority, then distance
-        if (a.canFulfill && !b.canFulfill) return -1;
-        if (!a.canFulfill && b.canFulfill) return 1;
-        if (a.isNearExpiry && !b.isNearExpiry) return -1;
-        if (!a.isNearExpiry && b.isNearExpiry) return 1;
-        return a.distance - b.distance;
       });
-  }, [centres, receiverCentre, requestedQty]);
+
+    // 2. Add District Warehouse option
+    const evaluatedWarehouse = {
+      ...districtWarehouse,
+      safetyReserve: 0,
+      safeTransferableSurplus: districtWarehouse.stock,
+      canFulfill: districtWarehouse.stock >= requestedQty,
+      partialFulfill: false,
+      isSameDistrict: true,
+      isNearExpiry: false,
+      fefoScore: 50,
+      is_warehouse: true
+    };
+
+    const allCandidates = [...evaluatedPeers, evaluatedWarehouse];
+
+    return allCandidates.sort((a, b) => {
+      // Warehouses ranked after peers
+      if (a.is_warehouse && !b.is_warehouse) return 1;
+      if (!a.is_warehouse && b.is_warehouse) return -1;
+
+      // Same-district peer centres first
+      if (a.isSameDistrict && !b.isSameDistrict) return -1;
+      if (!a.isSameDistrict && b.isSameDistrict) return 1;
+
+      // Fulfillment capacity
+      if (a.canFulfill && !b.canFulfill) return -1;
+      if (!a.canFulfill && b.canFulfill) return 1;
+
+      // FEFO near expiry priority
+      if (a.isNearExpiry && !b.isNearExpiry) return -1;
+      if (!a.isNearExpiry && b.isNearExpiry) return 1;
+
+      return (a.distance || 99) - (b.distance || 99);
+    });
+  }, [centres, receiverCentre, receiverDistrict, districtWarehouse, requestedQty]);
 
   // Set default donor to best candidate
   useMemo(() => {
     if (donorCandidates.length > 0 && !selectedDonorCode) {
-      const best = donorCandidates.find((d) => d.canFulfill) || donorCandidates[0];
-      if (best) setSelectedDonorCode(best.code);
+      const best = donorCandidates.find((d) => d.canFulfill && !d.is_warehouse) || donorCandidates[0];
+      if (best) {
+        setSelectedDonorCode(best.code);
+        setIsEscalatedToWarehouse(Boolean(best.is_warehouse));
+      }
     }
   }, [donorCandidates, selectedDonorCode]);
 
@@ -73,6 +148,8 @@ export default function SmartRequestModal({
       quantity: Number(requestedQty),
       reason,
       urgency,
+      is_escalation: Boolean(chosenDonor.is_warehouse),
+      is_cross_district: chosenDonor.district !== receiverDistrict,
       fefo_batch_number: chosenDonor.batch || 'TN-BATCH-FEFO',
       fefo_expiry_date: chosenDonor.expiry || '2026-11-15'
     };
@@ -91,10 +168,10 @@ export default function SmartRequestModal({
           <div>
             <h3 className="font-serif text-2xl text-ink">Smart Medicine Requisition</h3>
             <p className="text-xs text-slate-500">
-              Requesting Facility: <b className="text-slate-800">{receiverCentre.label}</b> &bull; Stock: {receiverCentre.stock} ({receiverCentre.days}d cover)
+              Requesting Facility: <b className="text-slate-800">{receiverCentre.label}</b> ({receiverDistrict} District) &bull; Stock: {receiverCentre.stock} ({receiverCentre.days}d cover)
             </p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100">
+          <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 cursor-pointer">
             <X size={18} />
           </button>
         </div>
@@ -125,7 +202,7 @@ export default function SmartRequestModal({
           </div>
 
           <div>
-            <label className="font-bold text-slate-700 block mb-1">Urgency & Clinical Reason</label>
+            <label className="font-bold text-slate-700 block mb-1">Clinical Reason &amp; Urgency</label>
             <textarea
               rows={2}
               value={reason}
@@ -135,54 +212,75 @@ export default function SmartRequestModal({
             />
           </div>
 
-          {/* Section 3 & 5: Evaluated Safe Donors with FEFO & Safety Buffers */}
+          {/* Section 5: Evaluated Donors Ranking */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="font-bold text-slate-700 block">
-                Evaluated Safe Donors (Safety Buffers Protected):
+                Ranked Donor Facilities (Same-District First &bull; Safety Reserves Protected):
               </label>
               <span className="text-[10px] text-teal font-semibold">
-                FEFO Priority Active
+                FEFO &amp; District Priority Active
               </span>
             </div>
 
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
               {donorCandidates.map((donor) => {
                 const isSelected = donor.code === selectedDonorCode;
+                const isCrossDistrict = donor.district !== receiverDistrict && !donor.is_warehouse;
+
                 return (
                   <div
                     key={donor.code}
-                    onClick={() => setSelectedDonorCode(donor.code)}
+                    onClick={() => {
+                      setSelectedDonorCode(donor.code);
+                      setIsEscalatedToWarehouse(Boolean(donor.is_warehouse));
+                    }}
                     className={`cursor-pointer rounded-2xl border p-3 transition flex items-center justify-between ${
                       isSelected
-                        ? 'border-teal bg-[#EAF4F4]'
+                        ? 'border-blue-600 bg-blue-50/70 shadow-2xs'
                         : donor.canFulfill
                         ? 'border-slate-200 bg-white hover:border-slate-300'
                         : 'border-slate-200 bg-slate-50 opacity-60'
                     }`}
                   >
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="font-bold text-slate-900">{donor.label}</span>
-                        {donor.canFulfill && (
-                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded-full text-[10px] font-bold">
-                            Safe Donor
+                        {donor.is_warehouse ? (
+                          <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[9px] font-bold">
+                            District Warehouse (Escalation)
+                          </span>
+                        ) : donor.isSameDistrict ? (
+                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[9px] font-bold">
+                            Same District ({donor.district})
+                          </span>
+                        ) : (
+                          <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-[9px] font-bold">
+                            Cross-District ({donor.district}) - Extra Approval
                           </span>
                         )}
+
                         {donor.isNearExpiry && (
-                          <span className="bg-amber-100 text-amber-800 px-2 py-0.2 rounded-full text-[10px] font-bold">
+                          <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full text-[9px] font-bold">
                             FEFO Priority (Exp: {donor.expiry})
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        Stock: {donor.stock} &bull; Safety Reserve: {donor.safetyReserve} &bull; Safe Surplus: <b>{donor.safeTransferableSurplus} units</b>
+
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        {donor.is_warehouse ? (
+                          <span>District Reserve: <b>{donor.stock} units available</b> &bull; Central Depot</span>
+                        ) : (
+                          <span>
+                            Stock: {donor.stock} &bull; Safety Reserve: {donor.safetyReserve} &bull; Safe Surplus: <b>{donor.safeTransferableSurplus} units</b>
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="font-bold text-teal">{donor.distance} km</div>
-                      <div className="text-[10px] text-slate-400">~{donor.time} mins drive</div>
+                    <div className="text-right shrink-0 ml-3">
+                      <div className="font-bold text-blue-600">~{donor.distance} km</div>
+                      <div className="text-[10px] text-slate-400">~{donor.time} min road</div>
                     </div>
                   </div>
                 );
@@ -190,33 +288,56 @@ export default function SmartRequestModal({
             </div>
           </div>
 
-          {/* Selected Donor Safeguard Summary */}
-          {chosenDonor && (
-            <div className="rounded-xl border border-teal-200 bg-[#EAF4F4]/60 p-3 flex items-start gap-2.5">
-              <ShieldCheck className="h-5 w-5 text-teal flex-shrink-0 mt-0.5" />
-              <div className="text-slate-700 leading-snug">
-                <b>Transfer Safeguard Verified: </b>
-                Transferring {requestedQty} units from {chosenDonor.label} leaves them with {chosenDonor.stock - requestedQty} units ({Math.round((chosenDonor.stock - requestedQty) / chosenDonor.usage)} days cover), protecting their safety reserve. Batch <b>{chosenDonor.batch}</b> (Exp: {chosenDonor.expiry}) prioritised under FEFO.
+          {/* Cross-District / Escalation Notice (Section 5) */}
+          {chosenDonor && chosenDonor.district !== receiverDistrict && !chosenDonor.is_warehouse && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-2.5 flex items-start gap-2 text-amber-900">
+              <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <b>Cross-District Transfer Notice: </b>
+                This transfer moves stock from <b>{chosenDonor.district}</b> to <b>{receiverDistrict}</b>. Cross-district transfers are flagged for higher-level District Officer approval per regulatory protocol.
+              </div>
+            </div>
+          )}
+
+          {chosenDonor && chosenDonor.is_warehouse && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 p-2.5 flex items-start gap-2 text-indigo-950">
+              <Building2 size={15} className="text-indigo-600 shrink-0 mt-0.5" />
+              <div>
+                <b>District Warehouse Escalation: </b>
+                This requisition creates a direct district emergency indent to <b>{chosenDonor.name}</b> for {requestedQty} units. Warehouse dispatches directly to the facility.
               </div>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
             <button
               type="button"
-              onClick={onClose}
-              className="rounded-full border border-slate-200 px-4 py-2 text-slate-600 hover:bg-slate-50"
+              onClick={() => {
+                setSelectedDonorCode(districtWarehouse.code);
+                setIsEscalatedToWarehouse(true);
+              }}
+              className="text-indigo-700 hover:text-indigo-900 text-xs font-bold underline cursor-pointer"
             >
-              Cancel
+              Escalate to {receiverDistrict} Warehouse &rarr;
             </button>
-            <button
-              type="submit"
-              disabled={submitting || !chosenDonor}
-              className="rounded-full bg-teal px-5 py-2 font-semibold text-white hover:bg-[#095959] transition shadow-xs disabled:opacity-50"
-            >
-              Submit Transfer Request &rarr;
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-slate-200 px-4 py-2 text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || !chosenDonor}
+                className="rounded-full bg-blue-600 px-5 py-2 font-semibold text-white hover:bg-blue-700 transition shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {chosenDonor?.is_warehouse ? 'Submit District Escalation' : 'Submit Transfer Request'} &rarr;
+              </button>
+            </div>
           </div>
         </form>
       </div>

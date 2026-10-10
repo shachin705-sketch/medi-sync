@@ -36,7 +36,9 @@ function initSchema() {
     'ALTER TABLE transfer_requests ADD COLUMN before_dest_stock INTEGER;',
     'ALTER TABLE transfer_requests ADD COLUMN after_dest_stock INTEGER;',
     'ALTER TABLE current_stock ADD COLUMN min_safety_stock INTEGER DEFAULT 14;',
-    'ALTER TABLE current_stock ADD COLUMN avg_daily_usage REAL DEFAULT 5;'
+    'ALTER TABLE current_stock ADD COLUMN avg_daily_usage REAL DEFAULT 5;',
+    'ALTER TABLE phcs ADD COLUMN facility_type TEXT DEFAULT "PHC";',
+    'ALTER TABLE phcs ADD COLUMN is_warehouse INTEGER DEFAULT 0;'
   ];
   additiveCols.forEach(cmd => {
     try { db.exec(cmd); } catch (e) {}

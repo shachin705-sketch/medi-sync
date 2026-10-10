@@ -116,16 +116,72 @@ const medicineStockProfiles = {
 };
 
 const initialCentresData = [
-  { code: 'A', label: 'Centre A (Melur PHC)', shortName: 'Melur PHC', type: 'Primary Health Centre (PHC)', district: 'Madurai', block: 'Melur Block', status: 'red', stock: 10, usage: 5, days: 2, needs: 116, distance: 9, time: 18, lat: 10.0272, lon: 78.3364, batch: 'TN-PCM-24A', expiry: '2027-08-31', lastUpdated: '10 mins ago', medicinesCount: 48, criticalCount: 2, lowStockCount: 3, nearExpiryCount: 1 },
-  { code: 'B', label: 'Centre B (Othakadai Upgraded PHC)', shortName: 'Othakadai CHC', type: 'Community Health Centre (CHC)', district: 'Madurai', block: 'Madurai East Block', status: 'green', stock: 400, usage: 8, days: 50, needs: 0, distance: 9, time: 18, lat: 9.9720, lon: 78.3050, batch: 'TN-PCM-23K', expiry: '2026-11-15', lastUpdated: '1 hr ago', medicinesCount: 48, criticalCount: 0, lowStockCount: 1, nearExpiryCount: 2 }, // FEFO near-expiry!
-  { code: 'C', label: 'Centre C (Usilampatti PHC)', shortName: 'Usilampatti PHC', type: 'Primary Health Centre (PHC)', district: 'Madurai', block: 'Usilampatti Block', status: 'amber', stock: 150, usage: 4, days: 8, needs: 30, distance: 28, time: 35, lat: 9.9692, lon: 77.7942, batch: 'TN-PCM-24C', expiry: '2027-12-31', lastUpdated: '2 hrs ago', medicinesCount: 48, criticalCount: 1, lowStockCount: 3, nearExpiryCount: 0 },
-  { code: 'D', label: 'Centre D (Thirumangalam CHC)', shortName: 'Thirumangalam CHC', type: 'Community Health Centre (CHC)', district: 'Madurai', block: 'Thirumangalam Block', status: 'amber', stock: 60, usage: 6, days: 10, needs: 0, distance: 22, time: 30, lat: 9.8228, lon: 77.9892, batch: 'TN-PCM-24D', expiry: '2028-01-31', lastUpdated: '2 days ago', medicinesCount: 48, criticalCount: 1, lowStockCount: 2, nearExpiryCount: 1 },
-  { code: 'E', label: 'Centre E (Natham PHC)', shortName: 'Natham PHC', type: 'Rural Primary Health Centre', district: 'Dindigul', block: 'Natham Block', status: 'green', stock: 120, usage: 4, days: 30, needs: 0, distance: 25, time: 32, lat: 10.2245, lon: 78.2361, batch: 'TN-PCM-24E', expiry: '2027-05-31', lastUpdated: '30 mins ago', medicinesCount: 48, criticalCount: 0, lowStockCount: 1, nearExpiryCount: 0 },
-  { code: 'F', label: 'Centre F (Palani Upgraded PHC)', shortName: 'Palani CHC', type: 'Upgraded Community Health Centre', district: 'Dindigul', block: 'Palani Block', status: 'grey', stock: 90, usage: 5, days: 9, needs: 0, distance: 68, time: 75, lat: 10.4503, lon: 77.5197, batch: 'TN-PCM-24F', expiry: '2027-09-30', lastUpdated: 'Yesterday (Stale)', medicinesCount: 48, criticalCount: 1, lowStockCount: 2, nearExpiryCount: 0 },
-  { code: 'G', label: 'Centre G (Periyakulam PHC)', shortName: 'Periyakulam PHC', type: 'Primary Health Centre (PHC)', district: 'Theni', block: 'Periyakulam Block', status: 'red', stock: 12, usage: 6, days: 2, needs: 60, distance: 54, time: 60, lat: 10.1189, lon: 77.5469, batch: 'TN-PCM-24G', expiry: '2027-11-30', lastUpdated: '1 hr ago', medicinesCount: 48, criticalCount: 2, lowStockCount: 3, nearExpiryCount: 0 },
-  { code: 'H', label: 'Centre H (Bodinayakanur PHC)', shortName: 'Bodinayakanur PHC', type: 'Primary Health Centre (PHC)', district: 'Theni', block: 'Bodinayakanur Block', status: 'green', stock: 260, usage: 7, days: 37, needs: 0, distance: 70, time: 80, lat: 10.0104, lon: 77.3512, batch: 'TN-PCM-24H', expiry: '2027-06-30', lastUpdated: '3 hrs ago', medicinesCount: 48, criticalCount: 0, lowStockCount: 1, nearExpiryCount: 0 },
-  { code: 'I', label: 'Centre I (Sivaganga UHC)', shortName: 'Sivaganga UHC', type: 'Urban Health Centre (UHC)', district: 'Sivaganga', block: 'Sivaganga Block', status: 'green', stock: 180, usage: 6, days: 18, needs: 0, distance: 40, time: 45, lat: 9.8467, lon: 78.4892, batch: 'TN-PCM-24I', expiry: '2028-03-31', lastUpdated: '45 mins ago', medicinesCount: 48, criticalCount: 0, lowStockCount: 1, nearExpiryCount: 1 },
-  { code: 'J', label: 'Centre J (Aruppukkottai BPHC)', shortName: 'Aruppukkottai BPHC', type: 'Block Primary Health Centre', district: 'Virudhunagar', block: 'Aruppukkottai Block', status: 'green', stock: 300, usage: 4, days: 30, needs: 0, distance: 48, time: 50, lat: 9.5856, lon: 77.9578, batch: 'TN-PCM-24J', expiry: '2028-05-31', lastUpdated: '2 hrs ago', medicinesCount: 48, criticalCount: 0, lowStockCount: 0, nearExpiryCount: 0 }
+  // Madurai District (4 centres)
+  { code: 'A', centreNum: 1, label: 'Centre 1 (Melur PHC)', shortName: 'Melur PHC', type: 'Primary Health Centre (PHC)', district: 'Madurai', block: 'Melur Block', status: 'red', stock: 10, usage: 5, days: 2, needs: 116, distance: 9, time: 18, lat: 10.0272, lon: 78.3364, batch: 'TN-PCM-24A', expiry: '2027-08-31', lastUpdated: '10 mins ago', medicinesCount: 48, criticalCount: 2, lowStockCount: 3, nearExpiryCount: 1, is_demo_receiver: true },
+  { code: 'B', centreNum: 2, label: 'Centre 2 (Othakadai Upgraded PHC)', shortName: 'Othakadai CHC', type: 'Primary Health Centre (PHC)', district: 'Madurai', block: 'Madurai East Block', status: 'green', stock: 400, usage: 8, days: 50, needs: 0, distance: 9, time: 18, lat: 9.9720, lon: 78.3050, batch: 'TN-PCM-23K', expiry: '2026-11-15', lastUpdated: '1 hr ago', medicinesCount: 48, criticalCount: 0, lowStockCount: 1, nearExpiryCount: 2, is_demo_donor: true }, // FEFO near-expiry!
+  { code: 'C', centreNum: 3, label: 'Centre 3 (Usilampatti PHC)', shortName: 'Usilampatti PHC', type: 'Primary Health Centre (PHC)', district: 'Madurai', block: 'Usilampatti Block', status: 'amber', stock: 150, usage: 4, days: 8, needs: 30, distance: 36, time: 42, lat: 9.9692, lon: 77.7942, batch: 'TN-PCM-24C', expiry: '2027-12-31', lastUpdated: '2 hrs ago', medicinesCount: 48, criticalCount: 1, lowStockCount: 3, nearExpiryCount: 0 },
+  { code: 'D', centreNum: 4, label: 'Centre 4 (Thirumangalam PHC)', shortName: 'Thirumangalam PHC', type: 'Primary Health Centre (PHC)', district: 'Madurai', block: 'Thirumangalam Block', status: 'amber', stock: 60, usage: 6, days: 10, needs: 0, distance: 22, time: 28, lat: 9.8228, lon: 77.9892, batch: 'TN-PCM-24D', expiry: '2028-01-31', lastUpdated: '2 days ago', medicinesCount: 48, criticalCount: 1, lowStockCount: 2, nearExpiryCount: 1 },
+
+  // Theni District (3 centres)
+  { code: 'E', centreNum: 5, label: 'Centre 5 (Periyakulam PHC)', shortName: 'Periyakulam PHC', type: 'Primary Health Centre (PHC)', district: 'Theni', block: 'Periyakulam Block', status: 'red', stock: 12, usage: 6, days: 2, needs: 60, distance: 54, time: 60, lat: 10.1189, lon: 77.5469, batch: 'TN-PCM-REC1', expiry: '2027-11-30', lastUpdated: '1 hr ago', medicinesCount: 48, criticalCount: 2, lowStockCount: 3, nearExpiryCount: 0, isRecalled: true },
+  { code: 'F', centreNum: 6, label: 'Centre 6 (Bodinayakanur PHC)', shortName: 'Bodinayakanur PHC', type: 'Primary Health Centre (PHC)', district: 'Theni', block: 'Bodinayakanur Block', status: 'grey', stock: 90, usage: 5, days: 18, needs: 0, distance: 70, time: 80, lat: 10.0104, lon: 77.3512, batch: 'TN-PCM-24F', expiry: '2027-09-30', lastUpdated: 'Yesterday (Stale Data)', medicinesCount: 48, criticalCount: 1, lowStockCount: 2, nearExpiryCount: 0, is_stale: true },
+  { code: 'G', centreNum: 7, label: 'Centre 7 (Cumbum PHC)', shortName: 'Cumbum PHC', type: 'Primary Health Centre (PHC)', district: 'Theni', block: 'Cumbum Block', status: 'amber', stock: 45, usage: 5, days: 9, needs: 25, distance: 85, time: 95, lat: 9.7344, lon: 77.2986, batch: 'TN-PCM-EXP', expiry: '2026-09-30', lastUpdated: '3 hrs ago', medicinesCount: 48, criticalCount: 1, lowStockCount: 2, nearExpiryCount: 1, hasExpiredBatch: true },
+
+  // Dindigul District (3 centres - Centre 10 Palani is the CHC; rest are PHCs)
+  { code: 'H', centreNum: 8, label: 'Centre 8 (Natham PHC)', shortName: 'Natham PHC', type: 'Primary Health Centre (PHC)', district: 'Dindigul', block: 'Natham Block', status: 'green', stock: 130, usage: 7, days: 18, needs: 0, distance: 25, time: 32, lat: 10.2245, lon: 78.2361, batch: 'TN-PCM-24H', expiry: '2027-06-30', lastUpdated: '30 mins ago', medicinesCount: 48, criticalCount: 0, lowStockCount: 1, nearExpiryCount: 0 },
+  { code: 'I', centreNum: 9, label: 'Centre 9 (Nilakottai PHC)', shortName: 'Nilakottai PHC', type: 'Primary Health Centre (PHC)', district: 'Dindigul', block: 'Nilakottai Block', status: 'green', stock: 180, usage: 6, days: 30, needs: 0, distance: 38, time: 45, lat: 10.1627, lon: 77.8619, batch: 'TN-PCM-24I', expiry: '2028-03-31', lastUpdated: '45 mins ago', medicinesCount: 48, criticalCount: 0, lowStockCount: 1, nearExpiryCount: 1 },
+  { code: 'J', centreNum: 10, label: 'Centre 10 (Palani Upgraded CHC)', shortName: 'Palani CHC', type: 'Community Health Centre (CHC)', district: 'Dindigul', block: 'Palani Block', status: 'green', stock: 300, usage: 4, days: 75, needs: 0, distance: 68, time: 75, lat: 10.4503, lon: 77.5197, batch: 'TN-PCM-24J', expiry: '2028-05-31', lastUpdated: '2 hrs ago', medicinesCount: 48, criticalCount: 0, lowStockCount: 0, nearExpiryCount: 0 }
+];
+
+export const districtWarehousesData = [
+  {
+    id: 'wh-madurai',
+    code: 'DDW-MDU',
+    label: 'Madurai District Drug Warehouse (Simulated)',
+    name: 'Madurai District Drug Warehouse',
+    type: 'DISTRICT',
+    district: 'Madurai',
+    block: 'Madurai HQ',
+    lat: 9.9252,
+    lon: 78.1198,
+    is_warehouse: true,
+    phone: '+91 94431 22091',
+    stock_summary: '2120 units available across district reserves',
+    last_updated: 'Just now (Verified)',
+    open_requests_count: 2
+  },
+  {
+    id: 'wh-theni',
+    code: 'DDW-THN',
+    label: 'Theni District Drug Warehouse (Simulated)',
+    name: 'Theni District Drug Warehouse',
+    type: 'DISTRICT',
+    district: 'Theni',
+    block: 'Theni HQ',
+    lat: 10.0104,
+    lon: 77.4768,
+    is_warehouse: true,
+    phone: '+91 94431 22092',
+    stock_summary: '2072 units available across district reserves',
+    last_updated: 'Just now (Verified)',
+    open_requests_count: 0
+  },
+  {
+    id: 'wh-dindigul',
+    code: 'DDW-DGL',
+    label: 'Dindigul District Drug Warehouse (Simulated)',
+    name: 'Dindigul District Drug Warehouse',
+    type: 'DISTRICT',
+    district: 'Dindigul',
+    block: 'Dindigul HQ',
+    lat: 10.3673,
+    lon: 77.9803,
+    is_warehouse: true,
+    phone: '+91 94431 22093',
+    stock_summary: '2258 units available across district reserves',
+    last_updated: 'Just now (Verified)',
+    open_requests_count: 0
+  }
 ];
 
 const initialTransfersData = [
@@ -263,6 +319,7 @@ export default function DemoApp() {
   const [inventorySearchTerm, setInventorySearchTerm] = useState('');
   const [inventoryBatchFilter, setInventoryBatchFilter] = useState('');
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState('all');
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
 
   // Modals & Drawers States
   const [drawerCentre, setDrawerCentre] = useState(null); // Inspect Inventory Drawer
@@ -315,6 +372,33 @@ export default function DemoApp() {
       distance: t.distance
     }));
   }, [transfers]);
+
+  // Section 5: Compact District Summary Table Data
+  const districtSummaryRows = useMemo(() => {
+    const districts = ['Madurai', 'Theni', 'Dindigul'];
+    return districts.map((dist) => {
+      const distCentres = centres.filter((c) => c.district === dist);
+      const critical = distCentres.filter((c) => c.status === 'red').length;
+      const low = distCentres.filter((c) => ['amber', 'yellow'].includes(c.status)).length;
+      const stale = distCentres.filter((c) => c.status === 'grey' || c.is_stale).length;
+      const healthy = distCentres.filter((c) => c.status === 'green').length;
+      const worstStatus = critical > 0 ? 'red' : low > 0 ? 'yellow' : stale > 0 ? 'grey' : 'green';
+      const pendingRequests = dist === 'Madurai' ? 2 : 0;
+      const nearExpiry = dist === 'Madurai' ? 2 : (dist === 'Theni' ? 1 : 0);
+
+      return {
+        district: dist,
+        centreCount: distCentres.length,
+        critical,
+        low,
+        healthy,
+        stale,
+        worstStatus,
+        pendingRequests,
+        nearExpiry
+      };
+    });
+  }, [centres]);
 
   // Handle changing active medicine to update centre stock data dynamically
   const handleSelectMedicine = (med) => {
@@ -1035,7 +1119,7 @@ export default function DemoApp() {
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">Tamil Nadu Health Facilities Network Map</h3>
                     <p className="text-xs text-slate-500">
-                      10 facilities across Madurai, Dindigul, Theni, Sivaganga, Virudhunagar &bull; Live stock risk, days of cover &amp; transfer routes
+                      10 facilities across 3 districts (Madurai: 4, Theni: 3, Dindigul: 3) + 3 District Drug Warehouses &bull; Live stock risk, days of cover &amp; transfer routes
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1054,7 +1138,7 @@ export default function DemoApp() {
                   <div className="flex items-center gap-2 font-medium text-slate-800">
                     <span className="h-2.5 w-2.5 rounded-full bg-blue-600 flex-shrink-0 animate-pulse"></span>
                     <span>
-                      <b>Active Transfer Route:</b> Centre B (Othakadai Upgraded PHC, Donor) &rarr; Centre A (Melur PHC, Deficit) &bull; 40 bottles
+                      <b>Active Transfer Route:</b> Centre 2 (Othakadai Upgraded PHC, Donor) &rarr; Centre 1 (Melur PHC, Deficit) &bull; 40 bottles
                     </span>
                   </div>
                   <div className="text-[11px] font-semibold text-slate-600 bg-white/80 border border-blue-200/60 px-2.5 py-0.5 rounded-md self-start sm:self-auto">
@@ -1062,13 +1146,15 @@ export default function DemoApp() {
                   </div>
                 </div>
 
-                {/* Interactive Leaflet Map (Tamil Nadu Only) */}
+                {/* Interactive Leaflet Map (Tamil Nadu Only with District Drill-down) */}
                 <SurplusMap
                   centres={centres}
                   selectedCentreCode={selectedCentreCode}
                   selectedMedicine={selectedMed}
+                  selectedDistrict={selectedDistrict}
                   transferRoutes={transferRoutes}
                   onSelectCentre={(code) => setSelectedCentreCode(code)}
+                  onSelectDistrict={(dist) => setSelectedDistrict(dist)}
                   onInspectInventory={(centre) => setDrawerCentre(centre)}
                   onRequestMedicine={(centre) => setRequestModalCentre(centre)}
                   onSelectMedicine={(med) => setSelectedMed(med)}
@@ -1079,6 +1165,81 @@ export default function DemoApp() {
                   mapMode={mapMode}
                   onToggleMapMode={() => setMapMode((prev) => (prev === 'tiles' ? 'schematic' : 'tiles'))}
                 />
+
+                {/* Section 5: Compact District Summary Table */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <Building2 size={15} className="text-slate-700" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                        Tamil Nadu District Summary (3 Demo Districts)
+                      </h4>
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Click a district row below to drill down on the map
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse bg-white rounded-lg border border-slate-200 shadow-2xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-100/70">
+                          <th className="py-2.5 px-3">District</th>
+                          <th className="py-2.5 px-3">Active Centres</th>
+                          <th className="py-2.5 px-3">Worst Status</th>
+                          <th className="py-2.5 px-3 text-red-600">Critical</th>
+                          <th className="py-2.5 px-3 text-amber-600">Low Stock</th>
+                          <th className="py-2.5 px-3 text-emerald-600">Healthy</th>
+                          <th className="py-2.5 px-3">Pending Requests</th>
+                          <th className="py-2.5 px-3">Near-Expiry Batches</th>
+                          <th className="py-2.5 px-3 text-right">Map Drilldown</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {districtSummaryRows.map((row) => (
+                          <tr
+                            key={row.district}
+                            onClick={() => setSelectedDistrict(selectedDistrict === row.district ? null : row.district)}
+                            className={`cursor-pointer transition hover:bg-blue-50/60 ${
+                              selectedDistrict === row.district ? 'bg-blue-50 border-l-4 border-l-blue-600 font-medium' : ''
+                            }`}
+                          >
+                            <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                              <span>📍 {row.district}</span>
+                              {selectedDistrict === row.district && (
+                                <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded font-bold">Selected</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-700 font-semibold">{row.centreCount} centres</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                row.worstStatus === 'red' ? 'bg-red-100 text-red-700' :
+                                row.worstStatus === 'yellow' || row.worstStatus === 'amber' ? 'bg-amber-100 text-amber-800' :
+                                row.worstStatus === 'grey' ? 'bg-slate-100 text-slate-700' :
+                                'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {row.worstStatus === 'red' ? 'Critical' : row.worstStatus === 'grey' ? 'Stale Data' : row.worstStatus === 'green' ? 'Healthy' : 'Low Stock'}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 font-bold text-red-600">{row.critical}</td>
+                            <td className="py-2.5 px-3 font-bold text-amber-600">{row.low}</td>
+                            <td className="py-2.5 px-3 font-bold text-emerald-600">{row.healthy}</td>
+                            <td className="py-2.5 px-3 font-semibold text-slate-700">{row.pendingRequests} req</td>
+                            <td className="py-2.5 px-3 font-semibold text-slate-700">{row.nearExpiry} batches</td>
+                            <td className="py-2.5 px-3 text-right">
+                              <button
+                                type="button"
+                                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                              >
+                                {selectedDistrict === row.district ? 'Reset View' : 'View on Map \u2192'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
 
               {/* DUAL GRID: Shortage Alerts + Recommended Transfers */}

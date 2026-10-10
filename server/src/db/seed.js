@@ -7,246 +7,269 @@ function seedDatabase() {
   db.exec('BEGIN TRANSACTION;');
   try {
     // Clear existing data in reverse order of foreign keys
-  db.exec('DELETE FROM notification_dispatches;');
-  db.exec('DELETE FROM audit_logs;');
-  db.exec('DELETE FROM emergency_indents;');
-  db.exec('DELETE FROM transfer_requests;');
-  db.exec('DELETE FROM alerts;');
-  db.exec('DELETE FROM stock_entries;');
-  db.exec('DELETE FROM current_stock;');
-  db.exec('DELETE FROM batches;');
-  db.exec('DELETE FROM medicines;');
-  db.exec('DELETE FROM users;');
-  db.exec('DELETE FROM phcs;');
+    try { db.exec('DELETE FROM bill_items;'); } catch (e) {}
+    try { db.exec('DELETE FROM bills;'); } catch (e) {}
+    try { db.exec('DELETE FROM stock_movements;'); } catch (e) {}
+    try { db.exec('DELETE FROM centre_batch_stock;'); } catch (e) {}
+    try { db.exec('DELETE FROM transfer_recommendations;'); } catch (e) {}
+    db.exec('DELETE FROM notification_dispatches;');
+    db.exec('DELETE FROM audit_logs;');
+    db.exec('DELETE FROM emergency_indents;');
+    db.exec('DELETE FROM transfer_requests;');
+    db.exec('DELETE FROM alerts;');
+    db.exec('DELETE FROM stock_entries;');
+    db.exec('DELETE FROM current_stock;');
+    db.exec('DELETE FROM batches;');
+    db.exec('DELETE FROM medicines;');
+    db.exec('DELETE FROM users;');
+    db.exec('DELETE FROM phcs;');
 
-  // 1. Insert 15 PHCs in Chengalpattu District across 3 Blocks
+  // 1. Insert 10 Health Centres in 3 Districts (Madurai: 4, Theni: 3, Dindigul: 3) + 3 District Warehouses
   const phcs = [
-    // Thiruporur Block
+    // Madurai District (4 centres)
     {
       id: 'phc-thiruporur',
-      name: 'Thiruporur PHC',
-      code: 'PHC-TPR-01',
-      block: 'Thiruporur Block',
-      district: 'Chengalpattu',
-      latitude: 12.7234,
-      longitude: 80.1906,
+      name: 'Melur Primary Health Centre',
+      code: 'A',
+      block: 'Melur Block',
+      district: 'Madurai',
+      latitude: 10.0272,
+      longitude: 78.3364,
       population_served: 48000,
       phone: '+91 94431 22001',
       cold_chain_equipped: 1,
       contact_person: 'Dr. S. Kaviya, MO',
-      address: 'Main Road, Thiruporur, Chengalpattu - 603110'
+      address: 'Main Road, Melur, Madurai - 625106',
+      facility_type: 'PHC',
+      is_warehouse: 0
     },
     {
       id: 'phc-kelambakkam',
-      name: 'Kelambakkam Upgraded PHC',
-      code: 'PHC-KLM-02',
-      block: 'Thiruporur Block',
-      district: 'Chengalpattu',
-      latitude: 12.7904,
-      longitude: 80.2223,
+      name: 'Othakadai Upgraded Community Health Centre',
+      code: 'B',
+      block: 'Madurai East Block',
+      district: 'Madurai',
+      latitude: 9.9720,
+      longitude: 78.3050,
       population_served: 54000,
       phone: '+91 94431 22002',
       cold_chain_equipped: 1,
       contact_person: 'Dr. M. Vignesh, MO',
-      address: 'OMR Junction, Kelambakkam, Chengalpattu - 603103'
+      address: 'Trichy Main Road, Othakadai, Madurai - 625107',
+      facility_type: 'PHC',
+      is_warehouse: 0
     },
     {
       id: 'phc-nemmeli',
-      name: 'Nemmeli PHC',
-      code: 'PHC-NML-03',
-      block: 'Thiruporur Block',
-      district: 'Chengalpattu',
-      latitude: 12.6938,
-      longitude: 80.2079,
+      name: 'Usilampatti Primary Health Centre',
+      code: 'C',
+      block: 'Usilampatti Block',
+      district: 'Madurai',
+      latitude: 9.9692,
+      longitude: 77.7942,
       population_served: 29000,
       phone: '+91 94431 22003',
       cold_chain_equipped: 1,
       contact_person: 'Dr. P. Anand, MO',
-      address: 'East Coast Road, Nemmeli, Chengalpattu - 603104'
+      address: 'Thevar Statue Junction, Usilampatti, Madurai - 625532',
+      facility_type: 'PHC',
+      is_warehouse: 0
     },
     {
       id: 'phc-kovalam',
-      name: 'Kovalam Coastal PHC',
-      code: 'PHC-KVL-04',
-      block: 'Thiruporur Block',
-      district: 'Chengalpattu',
-      latitude: 12.7936,
-      longitude: 80.2514,
+      name: 'Thirumangalam Primary Health Centre',
+      code: 'D',
+      block: 'Thirumangalam Block',
+      district: 'Madurai',
+      latitude: 9.8228,
+      longitude: 77.9892,
       population_served: 33000,
       phone: '+91 94431 22004',
       cold_chain_equipped: 1,
       contact_person: 'Dr. R. Meena, MO',
-      address: 'Near Fishermen Colony, Kovalam, Chengalpattu - 603112'
+      address: 'Near Bus Stand, Thirumangalam, Madurai - 625706',
+      facility_type: 'PHC',
+      is_warehouse: 0
     },
+
+    // Theni District (3 centres)
     {
       id: 'phc-alathur',
-      name: 'Alathur PHC',
-      code: 'PHC-ALT-05',
-      block: 'Thiruporur Block',
-      district: 'Chengalpattu',
-      latitude: 12.6653,
-      longitude: 80.1481,
-      population_served: 26000,
+      name: 'Periyakulam Primary Health Centre',
+      code: 'E',
+      block: 'Periyakulam Block',
+      district: 'Theni',
+      latitude: 10.1189,
+      longitude: 77.5469,
+      population_served: 38000,
       phone: '+91 94431 22005',
       cold_chain_equipped: 1,
       contact_person: 'Dr. T. Rajesh, MO',
-      address: 'Alathur Village, Chengalpattu - 603110'
+      address: 'Sothuparai Road, Periyakulam, Theni - 625601',
+      facility_type: 'PHC',
+      is_warehouse: 0
     },
-
-    // Madurantakam Block
     {
       id: 'phc-madurantakam',
-      name: 'Madurantakam Community Health Centre',
-      code: 'PHC-MDK-06',
-      block: 'Madurantakam Block',
-      district: 'Chengalpattu',
-      latitude: 12.5117,
-      longitude: 79.8858,
+      name: 'Bodinayakanur Primary Health Centre',
+      code: 'F',
+      block: 'Bodinayakanur Block',
+      district: 'Theni',
+      latitude: 10.0104,
+      longitude: 77.3512,
       population_served: 62000,
       phone: '+91 94431 22006',
       cold_chain_equipped: 1,
       contact_person: 'Dr. G. Selvam, MO',
-      address: 'Hospital Road, Madurantakam, Chengalpattu - 603306'
+      address: 'Paramasivan Kovil St, Bodinayakanur, Theni - 625513',
+      facility_type: 'PHC',
+      is_warehouse: 0
     },
     {
       id: 'phc-acharpakkam',
-      name: 'Acharapakkam Upgraded PHC',
-      code: 'PHC-ACP-07',
-      block: 'Madurantakam Block',
-      district: 'Chengalpattu',
-      latitude: 12.4172,
-      longitude: 79.8169,
-      population_served: 38000,
+      name: 'Cumbum Primary Health Centre',
+      code: 'G',
+      block: 'Cumbum Block',
+      district: 'Theni',
+      latitude: 9.7344,
+      longitude: 77.2986,
+      population_served: 41000,
       phone: '+91 94431 22007',
       cold_chain_equipped: 1,
       contact_person: 'Dr. D. Prema, MO',
-      address: 'GST Road, Acharapakkam, Chengalpattu - 603301'
+      address: 'Bypass Road, Cumbum, Theni - 625516',
+      facility_type: 'PHC',
+      is_warehouse: 0
     },
+
+    // Dindigul District (3 centres - Centre 10 Palani is the CHC; rest are PHCs)
     {
       id: 'phc-karunguzhi',
-      name: 'Karunguzhi PHC',
-      code: 'PHC-KRZ-08',
-      block: 'Madurantakam Block',
-      district: 'Chengalpattu',
-      latitude: 12.5447,
-      longitude: 79.9074,
+      name: 'Natham Primary Health Centre',
+      code: 'H',
+      block: 'Natham Block',
+      district: 'Dindigul',
+      latitude: 10.2245,
+      longitude: 78.2361,
       population_served: 31000,
       phone: '+91 94431 22008',
       cold_chain_equipped: 1,
       contact_person: 'Dr. S. Ramesh, MO',
-      address: 'Bazaar Street, Karunguzhi, Chengalpattu - 603303'
+      address: 'Madurai Road, Natham, Dindigul - 624401',
+      facility_type: 'PHC',
+      is_warehouse: 0
     },
-    {
-      id: 'phc-chunampet',
-      name: 'Chunampet PHC',
-      code: 'PHC-CNP-09',
-      block: 'Madurantakam Block',
-      district: 'Chengalpattu',
-      latitude: 12.3582,
-      longitude: 79.9431,
-      population_served: 27000,
-      phone: '+91 94431 22009',
-      cold_chain_equipped: 1,
-      contact_person: 'Dr. V. Deepa, MO',
-      address: 'Cheyyur Road, Chunampet, Chengalpattu - 603401'
-    },
-    {
-      id: 'phc-perumbair',
-      name: 'Perumbairkandigai PHC',
-      code: 'PHC-PBK-10',
-      block: 'Madurantakam Block',
-      district: 'Chengalpattu',
-      latitude: 12.4691,
-      longitude: 79.7912,
-      population_served: 24000,
-      phone: '+91 94431 22010',
-      cold_chain_equipped: 1,
-      contact_person: 'Dr. K. Surya, MO',
-      address: 'Perumbair Village, Chengalpattu - 603311'
-    },
-
-    // St. Thomas Mount / Kundrathur Block
     {
       id: 'phc-nandivaram',
-      name: 'Nandivaram-Guduvancheri PHC',
-      code: 'PHC-NDV-11',
-      block: 'St. Thomas Mount Block',
-      district: 'Chengalpattu',
-      latitude: 12.8624,
-      longitude: 80.0611,
-      population_served: 72000,
-      phone: '+91 94431 22011',
+      name: 'Nilakottai Primary Health Centre',
+      code: 'I',
+      block: 'Nilakottai Block',
+      district: 'Dindigul',
+      latitude: 10.1627,
+      longitude: 77.8619,
+      population_served: 44000,
+      phone: '+91 94431 22009',
       cold_chain_equipped: 1,
       contact_person: 'Dr. B. Saravanan, MO',
-      address: 'GST Road, Nandivaram, Guduvancheri - 603202'
+      address: 'Batlagundu Road, Nilakottai, Dindigul - 624208',
+      facility_type: 'PHC',
+      is_warehouse: 0
     },
     {
       id: 'phc-kundrathur',
-      name: 'Kundrathur Upgraded PHC',
-      code: 'PHC-KND-12',
-      block: 'St. Thomas Mount Block',
-      district: 'Chengalpattu',
-      latitude: 12.9723,
-      longitude: 80.0984,
+      name: 'Palani Upgraded Community Health Centre',
+      code: 'J',
+      block: 'Palani Block',
+      district: 'Dindigul',
+      latitude: 10.4503,
+      longitude: 77.5197,
       population_served: 68000,
-      phone: '+91 94431 22012',
+      phone: '+91 94431 22010',
       cold_chain_equipped: 1,
       contact_person: 'Dr. J. Nithya, MO',
-      address: 'Murugan Temple Road, Kundrathur - 600069'
+      address: 'Adivaram Road, Palani, Dindigul - 624601',
+      facility_type: 'CHC',
+      is_warehouse: 0
+    },
+
+    // Fictional District Drug Warehouses (1 per district, type DISTRICT, does NOT count toward min 3 centres)
+    {
+      id: 'wh-madurai',
+      name: 'Madurai District Drug Warehouse',
+      code: 'DDW-MDU',
+      block: 'Madurai HQ',
+      district: 'Madurai',
+      latitude: 9.9252,
+      longitude: 78.1198,
+      population_served: 0,
+      phone: '+91 94431 22091',
+      cold_chain_equipped: 1,
+      contact_person: 'District Drug Warehouse Officer',
+      address: 'Collectorate Complex, Madurai - 625020',
+      facility_type: 'DISTRICT',
+      is_warehouse: 1
     },
     {
-      id: 'phc-medavakkam',
-      name: 'Medavakkam PHC',
-      code: 'PHC-MDV-13',
-      block: 'St. Thomas Mount Block',
-      district: 'Chengalpattu',
-      latitude: 12.9189,
-      longitude: 80.1912,
-      population_served: 61000,
-      phone: '+91 94431 22013',
+      id: 'wh-theni',
+      name: 'Theni District Drug Warehouse',
+      code: 'DDW-THN',
+      block: 'Theni HQ',
+      district: 'Theni',
+      latitude: 10.0104,
+      longitude: 77.4768,
+      population_served: 0,
+      phone: '+91 94431 22092',
       cold_chain_equipped: 1,
-      contact_person: 'Dr. A. Karthik, MO',
-      address: 'Tambaram-Velachery Main Road, Medavakkam - 600100'
+      contact_person: 'District Drug Warehouse Officer',
+      address: 'District Collectorate, Theni - 625531',
+      facility_type: 'DISTRICT',
+      is_warehouse: 1
     },
     {
-      id: 'phc-peerkankaranai',
-      name: 'Peerkankaranai PHC',
-      code: 'PHC-PKR-14',
-      block: 'St. Thomas Mount Block',
-      district: 'Chengalpattu',
-      latitude: 12.9056,
-      longitude: 80.0882,
-      population_served: 45000,
-      phone: '+91 94431 22014',
+      id: 'wh-dindigul',
+      name: 'Dindigul District Drug Warehouse',
+      code: 'DDW-DGL',
+      block: 'Dindigul HQ',
+      district: 'Dindigul',
+      latitude: 10.3673,
+      longitude: 77.9803,
+      population_served: 0,
+      phone: '+91 94431 22093',
       cold_chain_equipped: 1,
-      contact_person: 'Dr. H. Radhika, MO',
-      address: 'Perungalathur West, Peerkankaranai - 600063'
-    },
-    {
-      id: 'phc-polichalur',
-      name: 'Polichalur PHC',
-      code: 'PHC-PCL-15',
-      block: 'St. Thomas Mount Block',
-      district: 'Chengalpattu',
-      latitude: 12.9774,
-      longitude: 80.1415,
-      population_served: 39000,
-      phone: '+91 94431 22015',
-      cold_chain_equipped: 1,
-      contact_person: 'Dr. E. Dinesh, MO',
-      address: 'Bhavani Nagar, Polichalur - 600074'
+      contact_person: 'District Drug Warehouse Officer',
+      address: 'Collectorate Master Plan Complex, Dindigul - 624004',
+      facility_type: 'DISTRICT',
+      is_warehouse: 1
     }
   ];
 
+  // Validation: a district cannot exist, or be left, with fewer than 3 active centres
+  const activeCentreCountsByDistrict = {};
+  phcs.forEach(p => {
+    if (!p.is_warehouse && p.facility_type !== 'DISTRICT') {
+      activeCentreCountsByDistrict[p.district] = (activeCentreCountsByDistrict[p.district] || 0) + 1;
+    }
+  });
+
+  for (const [dist, count] of Object.entries(activeCentreCountsByDistrict)) {
+    if (count < 3) {
+      throw new Error('A district needs at least 3 centres');
+    }
+  }
+
   const insertPhc = db.prepare(`
-    INSERT INTO phcs (id, name, code, block, district, latitude, longitude, population_served, phone, cold_chain_equipped, contact_person, address)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO phcs (id, name, code, block, district, latitude, longitude, population_served, phone, cold_chain_equipped, contact_person, address, facility_type, is_warehouse)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   phcs.forEach(p => {
-    insertPhc.run(p.id, p.name, p.code, p.block, p.district, p.latitude, p.longitude, p.population_served, p.phone, p.cold_chain_equipped, p.contact_person, p.address);
+    insertPhc.run(
+      p.id, p.name, p.code, p.block, p.district, p.latitude, p.longitude,
+      p.population_served, p.phone, p.cold_chain_equipped, p.contact_person, p.address,
+      p.facility_type || 'PHC', p.is_warehouse ? 1 : 0
+    );
   });
-  console.log(`✅ Seeded ${phcs.length} PHCs across 3 blocks.`);
+  console.log(`✅ Seeded ${phcs.length} healthcare facilities (10 centres across 3 districts + 3 district drug warehouses).`);
 
   // 2. Insert Users for each Role
   const passwordHash = bcrypt.hashSync('password123', 10);
