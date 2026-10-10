@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper: #F8FAFC;
+  --ink: #0F172A;
+  --teal: #0D9488;
+  --teal-dark: #115E59;
+  --accent: #EA580C;
+  --danger: #DC2626;
+  --danger-bg: #FEF2F2;
+  --amber: #D97706;
+  --amber-bg: #FFFBEB;
+  --success: #16A34A;
+  --success-bg: #F0FDF4;
+  --gray: #64748B;
+  --blue: #2563EB;
+}
+
+html, body, #root {
+  margin: 0;
+  min-height: 100%;
+  min-width: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Plus Jakarta Sans', 'Inter', 'Noto Sans Tamil', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+a { text-decoration: none; }
+
+body {
+  line-height: 1.5;
+}
+
+button, input, select, textarea { 
+  font: inherit; 
+}
+
+/* Leaflet map container fixes */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.75rem;
+  z-index: 10;
+}
+
+.leaflet-pane {
+  z-index: 10 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20 !important;
+}
+
+.leaflet-popup-pane {
+  z-index: 750 !important;
+}
+
+.vrx-leaflet-popup .leaflet-popup-content-wrapper {
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+  padding: 4px;
+  border: 1px solid #E2E8F0;
+}
+
+.vrx-leaflet-popup .leaflet-popup-content {
+  margin: 8px 10px;
+  line-height: 1.45;
+}
+
+.vrx-leaflet-popup .leaflet-popup-tip {
+  background: #FFFFFF;
+  box-shadow: 0 3px 6px rgba(15, 23, 42, 0.15);
+}
+
+/* Custom pulse animation for urgent red shortage markers */
+@keyframes urgent-pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+.urgent-marker-pulse {
+  animation: urgent-pulse 2s infinite;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Print Stylesheet for Official Government Transfer Slips */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-transfer-slip, #printable-transfer-slip * {
+    visibility: visible;
+  }
+  #printable-transfer-slip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
