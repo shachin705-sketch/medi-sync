@@ -150,21 +150,6 @@ export default function SurplusMap({
     }
   }, [selectedMedicine]);
 
-  // Synchronize drilledDistrict with external selectedDistrict prop
-  useEffect(() => {
-    if (selectedDistrict !== undefined && selectedDistrict !== drilledDistrict) {
-      setDrilledDistrict(selectedDistrict);
-      if (selectedDistrict && mapInstanceRef.current) {
-        const agg = districtAggregates[selectedDistrict];
-        if (agg && agg.centerLat && agg.centerLon) {
-          mapInstanceRef.current.setView([agg.centerLat, agg.centerLon], 10, { animate: true });
-        }
-      } else if (!selectedDistrict && mapInstanceRef.current) {
-        mapInstanceRef.current.setView(TAMIL_NADU_CENTER, TAMIL_NADU_ZOOM, { animate: true });
-      }
-    }
-  }, [selectedDistrict, districtAggregates, drilledDistrict]);
-
   // Available districts from centres
   const availableDistricts = useMemo(() => {
     const districts = new Set();
@@ -261,6 +246,21 @@ export default function SurplusMap({
 
     return map;
   }, [availableDistricts, centres]);
+
+  // Synchronize drilledDistrict with external selectedDistrict prop
+  useEffect(() => {
+    if (selectedDistrict !== undefined && selectedDistrict !== drilledDistrict) {
+      setDrilledDistrict(selectedDistrict);
+      if (selectedDistrict && mapInstanceRef.current) {
+        const agg = districtAggregates[selectedDistrict];
+        if (agg && agg.centerLat && agg.centerLon) {
+          mapInstanceRef.current.setView([agg.centerLat, agg.centerLon], 10, { animate: true });
+        }
+      } else if (!selectedDistrict && mapInstanceRef.current) {
+        mapInstanceRef.current.setView(TAMIL_NADU_CENTER, TAMIL_NADU_ZOOM, { animate: true });
+      }
+    }
+  }, [selectedDistrict, districtAggregates, drilledDistrict]);
 
   // Helper to determine marker colors & human labels
   const getMarkerStyle = useCallback((status) => {
