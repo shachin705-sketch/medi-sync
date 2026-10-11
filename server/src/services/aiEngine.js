@@ -222,12 +222,12 @@ function getRedistributionRecommendations(targetPhcId = null) {
     const targetBufferDays = shortage.critical_flag ? 30 : 25;
     const neededQuantity = Math.max(10, Math.round((targetBufferDays - shortage.days_left) * shortage.effective_adc));
 
-    // Find all other PHCs holding this medicine
+    // Find all other peer PHCs holding this medicine (exclude warehouses)
     const otherPhcStocks = db.prepare(`
-      SELECT cs.*, p.name as donor_name, p.block as donor_block, p.latitude, p.longitude, p.phone as donor_phone, p.cold_chain_equipped
+      SELECT cs.*, p.name as donor_name, p.block as donor_block, p.district as donor_district, p.latitude, p.longitude, p.phone as donor_phone, p.cold_chain_equipped, p.is_warehouse
       FROM current_stock cs
       JOIN phcs p ON cs.phc_id = p.id
-      WHERE cs.medicine_id = ? AND cs.phc_id != ?
+      WHERE cs.medicine_id = ? AND cs.phc_id != ? AND (p.is_warehouse = 0 OR p.is_warehouse IS NULL)
     `).all(shortage.medicine_id, shortage.phc_id);
 
     const surplusCandidates = [];
@@ -260,6 +260,10 @@ function getRedistributionRecommendations(targetPhcId = null) {
           expiryBonus = 25; // Bonus score to move soon-to-expire stock first
         }
 
+        // Same-district priority bonus (same district peers first)
+        const isSameDistrict = donor.donor_district === requestingPhc.district;
+        const sameDistrictBonus = isSameDistrict ? 50 : 0;
+
         // Distance score penalty (closer is exponentially better)
         const distanceScore = Math.max(0, 100 - (crowDist * 3));
 
@@ -269,8 +273,9 @@ function getRedistributionRecommendations(targetPhcId = null) {
 
         // Composite Recommendation Score (0 - 100)
         const compositeScore = Math.round(
-          (coverageRatio * 40) +
-          (distanceScore * 0.40) +
+          (coverageRatio * 30) +
+          (distanceScore * 0.30) +
+          sameDistrictBonus +
           expiryBonus
         );
 
@@ -278,6 +283,7 @@ function getRedistributionRecommendations(targetPhcId = null) {
           source_phc_id: donor.phc_id,
           source_phc_name: donor.donor_name,
           source_phc_block: donor.donor_block,
+          source_phc_district: donor.donor_district,
           source_phone: donor.donor_phone,
           crow_distance_km: crowDist,
           road_distance_km: roadInfo.roadDistanceKm,

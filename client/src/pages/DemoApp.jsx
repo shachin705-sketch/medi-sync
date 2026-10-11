@@ -26,6 +26,7 @@ import { getPlainLanguageExplanation } from '../utils/plainLanguageAlerts';
 import { clearOfflineDataOnSignOut } from '../utils/offlineDb';
 import { Wifi, WifiOff, CloudUpload, LogOut } from 'lucide-react';
 import { api } from '../utils/api';
+import allFacilitiesData from '../config/geo.json';
 
 const medicineList = [
   'Paracetamol Syrup',
@@ -337,12 +338,42 @@ export default function DemoApp() {
   const [selectedRole, setSelectedRole] = useState('Block Officer');
   const [selectedCentreCode, setSelectedCentreCode] = useState('A');
 
-  // Application Data States
+  // Application Data States - Full 38-District Network (133 Centres + 38 DDWs)
   const [centres, setCentres] = useState(() => {
-    return initialCentresData.map(c => ({
-      ...c,
-      id: codeToPhcId[c.code] || `phc-${c.code.toLowerCase()}`
-    }));
+    const geoCentres = allFacilitiesData.filter(f => !f.is_warehouse);
+    const baseMap = new Map();
+    initialCentresData.forEach(c => baseMap.set(c.code, c));
+
+    return geoCentres.map((gc, idx) => {
+      if (baseMap.has(gc.code)) {
+        const base = baseMap.get(gc.code);
+        return {
+          ...gc,
+          ...base,
+          id: codeToPhcId[base.code] || `phc-${base.code.toLowerCase()}`
+        };
+      }
+      return {
+        ...gc,
+        id: gc.id || `phc-${gc.code ? gc.code.toLowerCase() : idx}`,
+        centreNum: idx + 11,
+        shortName: gc.name || gc.label,
+        stock: gc.stock ?? 160,
+        usage: gc.usage ?? 5,
+        days: gc.days ?? 32,
+        status: gc.status ?? 'green',
+        needs: 0,
+        distance: 30,
+        time: 40,
+        batch: `TN-GEN-${gc.code || idx}`,
+        expiry: '2027-12-31',
+        lastUpdated: '15 mins ago',
+        medicinesCount: 48,
+        criticalCount: 0,
+        lowStockCount: 1,
+        nearExpiryCount: 0
+      };
+    });
   });
   const [transfers, setTransfers] = useState(initialTransfersData);
   const [alerts, setAlerts] = useState(initialAlertsData);
@@ -515,10 +546,18 @@ export default function DemoApp() {
     }));
   }, [transfers]);
 
-  // Section 5: Compact District Summary Table Data
+  // Section 5: Compact District Summary Table Data (All 38 Districts)
+  const [districtSummarySearch, setDistrictSummarySearch] = useState('');
   const districtSummaryRows = useMemo(() => {
-    const districts = ['Madurai', 'Theni', 'Dindigul'];
-    return districts.map((dist) => {
+    const districtsSet = new Set();
+    centres.forEach((c) => {
+      if (c.district && c.district !== 'District not set') {
+        districtsSet.add(c.district);
+      }
+    });
+    const districts = Array.from(districtsSet).sort();
+
+    const rows = districts.map((dist) => {
       const distCentres = centres.filter((c) => c.district === dist);
       const critical = distCentres.filter((c) => c.status === 'red').length;
       const low = distCentres.filter((c) => ['amber', 'yellow'].includes(c.status)).length;
@@ -526,7 +565,7 @@ export default function DemoApp() {
       const healthy = distCentres.filter((c) => c.status === 'green').length;
       const worstStatus = critical > 0 ? 'red' : low > 0 ? 'yellow' : stale > 0 ? 'grey' : 'green';
       const pendingRequests = dist === 'Madurai' ? 2 : 0;
-      const nearExpiry = dist === 'Madurai' ? 2 : (dist === 'Theni' ? 1 : 0);
+      const nearExpiry = distCentres.reduce((sum, c) => sum + (c.nearExpiryCount || 0), 0);
 
       return {
         district: dist,
@@ -540,7 +579,13 @@ export default function DemoApp() {
         nearExpiry
       };
     });
-  }, [centres]);
+
+    if (districtSummarySearch.trim()) {
+      const q = districtSummarySearch.toLowerCase().trim();
+      return rows.filter(r => r.district.toLowerCase().includes(q));
+    }
+    return rows;
+  }, [centres, districtSummarySearch]);
 
   // Handle changing active medicine to update centre stock data dynamically
   const handleSelectMedicine = (med) => {
@@ -1347,7 +1392,46 @@ export default function DemoApp() {
                   </div>
                 </div>
 
-                {/* Interactive Leaflet Map (Tamil Nadu Only with District Drill-down) */}
+                {/* Statewide 38-District Risk & Logistics Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-3 rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white shadow-soft">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">State Districts</span>
+                    <span className="text-lg font-extrabold flex items-center gap-1">
+                      <span>38</span>
+                      <span className="text-[10px] font-semibold text-blue-300">all monitored</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Active Facilities</span>
+                    <span className="text-lg font-extrabold flex items-center gap-1">
+                      <span>133</span>
+                      <span className="text-[10px] font-semibold text-blue-300">3-4 / dist</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">Drug Warehouses</span>
+                    <span className="text-lg font-extrabold flex items-center gap-1">
+                      <span>38</span>
+                      <span className="text-[10px] font-semibold text-indigo-300">DDW nodes</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-200">Critical Shortages</span>
+                    <span className="text-lg font-extrabold text-amber-300 flex items-center gap-1">
+                      <span>{centres.filter(c => c.status === 'red').length}</span>
+                      <span className="text-[10px] font-semibold text-amber-200">&lt;3d stock</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col col-span-2 sm:col-span-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">FEFO Automation</span>
+                    <span className="text-lg font-extrabold text-emerald-300 flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>ACTIVE</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Interactive Leaflet Map (Tamil Nadu 38-District Drill-down) */}
                 <SurplusMap
                   centres={centres}
                   selectedCentreCode={selectedCentreCode}
@@ -1362,81 +1446,117 @@ export default function DemoApp() {
                   onSelectRoute={(route) => {
                     setActiveNav('Approvals');
                   }}
-                  height="520px"
+                  height="540px"
                   mapMode={mapMode}
                   onToggleMapMode={() => setMapMode((prev) => (prev === 'tiles' ? 'schematic' : 'tiles'))}
                 />
 
-                {/* Section 5: Compact District Summary Table */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <Building2 size={15} className="text-slate-700" />
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                        Tamil Nadu District Summary (3 Demo Districts)
-                      </h4>
+                {/* Section 5: Compact District Summary Table (All 38 Districts) */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Building2 size={16} className="text-blue-600" />
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                          Tamil Nadu District Summary ({districtSummaryRows.length} of 38 Districts)
+                        </h4>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          Click any district row below to drill down on the interactive map
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      Click a district row below to drill down on the map
-                    </span>
+                    {/* District Search Filter */}
+                    <div className="relative w-full sm:w-56">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Filter 38 districts..."
+                        value={districtSummarySearch}
+                        onChange={(e) => setDistrictSummarySearch(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-8 pr-7 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-hidden shadow-2xs"
+                      />
+                      {districtSummarySearch && (
+                        <button
+                          onClick={() => setDistrictSummarySearch('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse bg-white rounded-lg border border-slate-200 shadow-2xs">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-100/70">
+                  <div className="overflow-x-auto max-h-[360px] rounded-lg border border-slate-200 bg-white shadow-2xs">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-100 shadow-2xs">
                           <th className="py-2.5 px-3">District</th>
                           <th className="py-2.5 px-3">Active Centres</th>
                           <th className="py-2.5 px-3">Worst Status</th>
+                          <th className="py-2.5 px-3">Stock Ratio</th>
                           <th className="py-2.5 px-3 text-red-600">Critical</th>
-                          <th className="py-2.5 px-3 text-amber-600">Low Stock</th>
+                          <th className="py-2.5 px-3 text-amber-600">Low</th>
                           <th className="py-2.5 px-3 text-emerald-600">Healthy</th>
-                          <th className="py-2.5 px-3">Pending Requests</th>
-                          <th className="py-2.5 px-3">Near-Expiry Batches</th>
-                          <th className="py-2.5 px-3 text-right">Map Drilldown</th>
+                          <th className="py-2.5 px-3">Requests</th>
+                          <th className="py-2.5 px-3">Near-Expiry</th>
+                          <th className="py-2.5 px-3 text-right">Map Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {districtSummaryRows.map((row) => (
-                          <tr
-                            key={row.district}
-                            onClick={() => setSelectedDistrict(selectedDistrict === row.district ? null : row.district)}
-                            className={`cursor-pointer transition hover:bg-blue-50/60 ${
-                              selectedDistrict === row.district ? 'bg-blue-50 border-l-4 border-l-blue-600 font-medium' : ''
-                            }`}
-                          >
-                            <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
-                              <span>📍 {row.district}</span>
-                              {selectedDistrict === row.district && (
-                                <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded font-bold">Selected</span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3 text-slate-700 font-semibold">{row.centreCount} centres</td>
-                            <td className="py-2.5 px-3">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                                row.worstStatus === 'red' ? 'bg-red-100 text-red-700' :
-                                row.worstStatus === 'yellow' || row.worstStatus === 'amber' ? 'bg-amber-100 text-amber-800' :
-                                row.worstStatus === 'grey' ? 'bg-slate-100 text-slate-700' :
-                                'bg-emerald-100 text-emerald-700'
-                              }`}>
-                                {row.worstStatus === 'red' ? 'Critical' : row.worstStatus === 'grey' ? 'Stale Data' : row.worstStatus === 'green' ? 'Healthy' : 'Low Stock'}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 font-bold text-red-600">{row.critical}</td>
-                            <td className="py-2.5 px-3 font-bold text-amber-600">{row.low}</td>
-                            <td className="py-2.5 px-3 font-bold text-emerald-600">{row.healthy}</td>
-                            <td className="py-2.5 px-3 font-semibold text-slate-700">{row.pendingRequests} req</td>
-                            <td className="py-2.5 px-3 font-semibold text-slate-700">{row.nearExpiry} batches</td>
-                            <td className="py-2.5 px-3 text-right">
-                              <button
-                                type="button"
-                                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                              >
-                                {selectedDistrict === row.district ? 'Reset View' : 'View on Map \u2192'}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {districtSummaryRows.map((row) => {
+                          const critPct = (row.critical / row.centreCount) * 100;
+                          const lowPct = (row.low / row.centreCount) * 100;
+                          const okPct = (row.healthy / row.centreCount) * 100;
+
+                          return (
+                            <tr
+                              key={row.district}
+                              onClick={() => setSelectedDistrict(selectedDistrict === row.district ? null : row.district)}
+                              className={`cursor-pointer transition hover:bg-blue-50/70 ${
+                                selectedDistrict === row.district ? 'bg-blue-50/90 border-l-4 border-l-blue-600 font-medium' : ''
+                              }`}
+                            >
+                              <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                                <span>📍 {row.district}</span>
+                                {selectedDistrict === row.district && (
+                                  <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded font-bold">Drilled</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-700 font-semibold">{row.centreCount} centres</td>
+                              <td className="py-2.5 px-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                  row.worstStatus === 'red' ? 'bg-red-100 text-red-700' :
+                                  row.worstStatus === 'yellow' || row.worstStatus === 'amber' ? 'bg-amber-100 text-amber-800' :
+                                  row.worstStatus === 'grey' ? 'bg-slate-100 text-slate-700' :
+                                  'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {row.worstStatus === 'red' ? 'Critical' : row.worstStatus === 'grey' ? 'Stale Data' : row.worstStatus === 'green' ? 'Healthy' : 'Low Stock'}
+                                </span>
+                              </td>
+                              {/* Stacked Status Visual Bar */}
+                              <td className="py-2.5 px-3">
+                                <div className="flex h-2 w-20 overflow-hidden rounded-full bg-slate-200" title={`${row.critical} Critical, ${row.low} Low, ${row.healthy} Healthy`}>
+                                  {critPct > 0 && <div style={{ width: `${critPct}%` }} className="bg-red-500"></div>}
+                                  {lowPct > 0 && <div style={{ width: `${lowPct}%` }} className="bg-amber-400"></div>}
+                                  {okPct > 0 && <div style={{ width: `${okPct}%` }} className="bg-emerald-500"></div>}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 font-bold text-red-600">{row.critical}</td>
+                              <td className="py-2.5 px-3 font-bold text-amber-600">{row.low}</td>
+                              <td className="py-2.5 px-3 font-bold text-emerald-600">{row.healthy}</td>
+                              <td className="py-2.5 px-3 font-semibold text-slate-700">{row.pendingRequests} req</td>
+                              <td className="py-2.5 px-3 font-semibold text-slate-700">{row.nearExpiry}</td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button
+                                  type="button"
+                                  className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                >
+                                  {selectedDistrict === row.district ? 'Reset View' : 'Drill down \u2192'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

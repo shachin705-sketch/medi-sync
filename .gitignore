@@ -2,5 +2,34 @@ node_modules
 client/node_modules
 server/node_modules
 client/dist
+client/.vite
+.vite
 .git
 *.log
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Build output
+dist
+build
+
+# Cache files
+.cache
+.eslintcache
+*.tsbuildinfo
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode
+.idea

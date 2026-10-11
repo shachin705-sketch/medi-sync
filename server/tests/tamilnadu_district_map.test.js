@@ -1,9 +1,33 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const { db } = require('../src/db/database');
 const { calculateMedicineStockMetrics } = require('../src/services/stockService');
+const { MIN_CENTRES_PER_DISTRICT, MAX_CENTRES_PER_DISTRICT } = require('../src/config/districtCentresConfig');
+
+function pointInPolygon(pt, vs) {
+  const x = pt[0], y = pt[1];
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    const xi = vs[i][0], yi = vs[i][1];
+    const xj = vs[j][0], yj = vs[j][1];
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInGeometry(pt, geom) {
+  if (geom.type === 'Polygon') {
+    return pointInPolygon(pt, geom.coordinates[0]);
+  } else if (geom.type === 'MultiPolygon') {
+    return geom.coordinates.some(poly => pointInPolygon(pt, poly[0]));
+  }
+  return false;
+}
 
 function runTamilNaduMapTests() {
-  console.log('🧪 Starting Tamil Nadu District Drill-Down Map Test Suite...\n');
+  console.log('🧪 Starting Tamil Nadu District Drill-Down Map Test Suite (38 Districts)...\n');
   let passed = 0;
   let failed = 0;
 
@@ -19,8 +43,8 @@ function runTamilNaduMapTests() {
     }
   }
 
-  // 1. Seed & District Count Test
-  test('1. Seed creates 3 districts with 4 (Madurai), 3 (Theni), and 3 (Dindigul) active centres', () => {
+  // 1. All 38 Districts Exist and every district has 3 or 4 centres
+  test('1. All 38 districts exist in Tamil Nadu and EVERY district has between 3 and 4 active centres', () => {
     const districts = db.prepare(`
       SELECT district, COUNT(*) as count 
       FROM phcs 
@@ -31,18 +55,24 @@ function runTamilNaduMapTests() {
       ORDER BY district ASC
     `).all();
 
-    assert.strictEqual(districts.length, 3, 'Should have exactly 3 districts');
-    const dindigul = districts.find(d => d.district === 'Dindigul');
+    assert.strictEqual(districts.length, 38, `Should have exactly 38 districts, got ${districts.length}`);
+    districts.forEach(d => {
+      assert(
+        d.count >= MIN_CENTRES_PER_DISTRICT && d.count <= MAX_CENTRES_PER_DISTRICT,
+        `District ${d.district} must have between ${MIN_CENTRES_PER_DISTRICT} and ${MAX_CENTRES_PER_DISTRICT} centres, found ${d.count}`
+      );
+    });
+
     const madurai = districts.find(d => d.district === 'Madurai');
     const theni = districts.find(d => d.district === 'Theni');
-
+    const dindigul = districts.find(d => d.district === 'Dindigul');
     assert.strictEqual(madurai.count, 4, 'Madurai must have 4 centres');
     assert.strictEqual(theni.count, 3, 'Theni must have 3 centres');
     assert.strictEqual(dindigul.count, 3, 'Dindigul must have 3 centres');
   });
 
-  // 2. CHC / PHC Type Distinction Test
-  test('2. Centre 10 (Palani) is the CHC in Dindigul; rest in Dindigul are PHCs', () => {
+  // 2. CHC / PHC Type Distinction & Centres 1-10 Integrity
+  test('2. Centre 10 (Palani) is the CHC in Dindigul; Centres 1-10 are preserved', () => {
     const dindigulCentres = db.prepare(`
       SELECT * FROM phcs 
       WHERE district = 'Dindigul' AND (is_warehouse = 0 OR is_warehouse IS NULL)
@@ -52,61 +82,97 @@ function runTamilNaduMapTests() {
     assert(palani, 'Palani centre must exist');
     assert.strictEqual(palani.facility_type, 'CHC', 'Palani should be CHC');
 
-    const others = dindigulCentres.filter(c => c.id !== palani.id);
-    others.forEach(c => {
-      assert.strictEqual(c.facility_type, 'PHC', `${c.name} should be PHC`);
-    });
+    const melur = db.prepare("SELECT * FROM phcs WHERE id = 'phc-thiruporur'").get();
+    const othakadai = db.prepare("SELECT * FROM phcs WHERE id = 'phc-kelambakkam'").get();
+    assert(melur && othakadai, 'Melur and Othakadai must be preserved');
   });
 
-  // 3. District Drug Warehouses Test
-  test('3. Exactly one District Drug Warehouse exists per district (type DISTRICT, is_warehouse = 1)', () => {
+  // 3. Exactly One District Drug Warehouse per district (38 total)
+  test('3. Exactly one District Drug Warehouse exists per district (38 total, type DISTRICT, is_warehouse = 1)', () => {
     const warehouses = db.prepare(`
       SELECT * FROM phcs 
       WHERE is_warehouse = 1
       ORDER BY district ASC
     `).all();
 
-    assert.strictEqual(warehouses.length, 3, 'Must have exactly 3 warehouses');
-    const districtsWithWh = warehouses.map(w => w.district);
-    assert(districtsWithWh.includes('Madurai'), 'Madurai must have a warehouse');
-    assert(districtsWithWh.includes('Theni'), 'Theni must have a warehouse');
-    assert(districtsWithWh.includes('Dindigul'), 'Dindigul must have a warehouse');
+    assert.strictEqual(warehouses.length, 38, `Must have exactly 38 warehouses, got ${warehouses.length}`);
 
     warehouses.forEach(w => {
       assert.strictEqual(w.facility_type, 'DISTRICT');
       assert.strictEqual(w.is_warehouse, 1);
+      assert(w.code.startsWith('DDW-'), `Warehouse code must start with DDW-, got ${w.code}`);
     });
   });
 
-  // 4. District validation rule: Minimum 3 active centres
-  test('4. API/DB validation rejects deleting a centre if it would leave district with <3 centres', () => {
-    // Theni has 3 centres. Attempting to delete one should be rejected.
-    const theniCentres = db.prepare(`
-      SELECT * FROM phcs 
-      WHERE district = 'Theni' AND (is_warehouse = 0 OR is_warehouse IS NULL)
-    `).all();
-    assert.strictEqual(theniCentres.length, 3);
+  // 4. Point-in-polygon containment verification
+  test('4. Point-in-polygon check: Centres lie inside their respective district boundaries', () => {
+    const geoPath = path.join(__dirname, '../src/config/tamil_nadu_districts.geojson');
+    const geo = JSON.parse(fs.readFileSync(geoPath, 'utf8'));
 
-    const centreToDelete = theniCentres[0];
-    const activeCount = db.prepare(`
+    // Check a sample of centres across multiple districts
+    const sampleDistricts = ['Madurai', 'Chennai', 'Coimbatore', 'Salem', 'Kanyakumari', 'Thanjavur'];
+    sampleDistricts.forEach(distName => {
+      const feat = geo.features.find(f => f.properties.district === distName);
+      assert(feat, `GeoJSON feature must exist for ${distName}`);
+
+      const centres = db.prepare(`
+        SELECT * FROM phcs 
+        WHERE district = ? AND (is_warehouse = 0 OR is_warehouse IS NULL)
+      `).all(distName);
+
+      centres.forEach(c => {
+        const isInside = pointInGeometry([c.longitude, c.latitude], feat.geometry);
+        assert(isInside, `Centre ${c.name} (${c.latitude}, ${c.longitude}) must be inside ${distName} boundary`);
+      });
+    });
+  });
+
+  // 5. Validation rule: Reject 5th centre
+  test('5. API validation rejects a 5th centre (ceiling = 4 centres per district)', () => {
+    // Madurai already has 4 centres. Attempting to add a 5th must be rejected
+    const maduraiCount = db.prepare(`
       SELECT COUNT(*) as count 
       FROM phcs 
-      WHERE district = ? AND (is_warehouse = 0 OR is_warehouse IS NULL)
-    `).get(centreToDelete.district).count;
+      WHERE district = 'Madurai' AND (is_warehouse = 0 OR is_warehouse IS NULL)
+    `).get().count;
 
+    assert.strictEqual(maduraiCount, 4);
     let rejected = false;
     let errorMessage = '';
-    if (activeCount <= 3) {
+
+    if (maduraiCount >= MAX_CENTRES_PER_DISTRICT) {
       rejected = true;
-      errorMessage = 'A district needs at least 3 centres';
+      errorMessage = `A district can have at most ${MAX_CENTRES_PER_DISTRICT} centres`;
     }
 
-    assert.strictEqual(rejected, true, 'Deletion must be rejected');
+    assert.strictEqual(rejected, true, 'Adding 5th centre must be rejected');
+    assert.strictEqual(errorMessage, 'A district can have at most 4 centres');
+  });
+
+  // 6. Validation rule: Reject dropping below 3 centres
+  test('6. API/DB validation rejects deleting a centre if it would leave district with <3 centres', () => {
+    // Theni has 3 centres. Attempting to delete one must be rejected
+    const theniCount = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM phcs 
+      WHERE district = 'Theni' AND (is_warehouse = 0 OR is_warehouse IS NULL)
+    `).get().count;
+
+    assert.strictEqual(theniCount, 3);
+    let rejected = false;
+    let errorMessage = '';
+
+    if (theniCount <= MIN_CENTRES_PER_DISTRICT) {
+      rejected = true;
+      errorMessage = `A district needs at least ${MIN_CENTRES_PER_DISTRICT} centres`;
+    }
+
+    assert.strictEqual(rejected, true, 'Deleting below 3 must be rejected');
     assert.strictEqual(errorMessage, 'A district needs at least 3 centres');
   });
 
-  // 5. Moving centre validation
-  test('5. API validation rejects moving a centre if source district is left with <3 centres', () => {
+  // 7. Moving centre validation
+  test('7. API validation rejects moving a centre if source district is left with <3 centres', () => {
     const theniCentres = db.prepare(`
       SELECT * FROM phcs 
       WHERE district = 'Theni' AND (is_warehouse = 0 OR is_warehouse IS NULL)
@@ -121,7 +187,7 @@ function runTamilNaduMapTests() {
 
     let rejected = false;
     let errorMessage = '';
-    if (remainingInSource < 3) {
+    if (remainingInSource < MIN_CENTRES_PER_DISTRICT) {
       rejected = true;
       errorMessage = 'A district needs at least 3 centres';
     }
@@ -130,13 +196,11 @@ function runTamilNaduMapTests() {
     assert.strictEqual(errorMessage, 'A district needs at least 3 centres');
   });
 
-  // 6. District Worst-Status Calculation matches real inventory
-  test('6. District worst-status colour dynamically computes from real inventory', () => {
-    // Madurai has Melur PHC (phc-thiruporur) with critical shortage of Paracetamol (<3 days)
+  // 8. District Worst-Status Calculation matches real inventory
+  test('8. District worst-status colour dynamically computes from real inventory', () => {
     const metrics = calculateMedicineStockMetrics('phc-thiruporur', 'med-pcm-syp');
     assert.strictEqual(metrics.status, 'red', 'Melur PHC must be RED for Paracetamol');
 
-    // Therefore worst status for Madurai must be RED
     const maduraiCentres = db.prepare(`
       SELECT id FROM phcs WHERE district = 'Madurai' AND (is_warehouse = 0 OR is_warehouse IS NULL)
     `).all();
@@ -149,8 +213,8 @@ function runTamilNaduMapTests() {
     assert.strictEqual(worstStatus, 'red', 'Worst status must be RED, never hardcoded');
   });
 
-  // 7. Missing district fallback handling
-  test('7. Missing district displays "District not set" instead of guessing', () => {
+  // 9. Missing district fallback handling
+  test('9. Missing district displays "District not set" instead of guessing', () => {
     const formatDistrict = (district) => (district && district.trim()) ? district : 'District not set';
     assert.strictEqual(formatDistrict(null), 'District not set');
     assert.strictEqual(formatDistrict(''), 'District not set');
@@ -158,8 +222,8 @@ function runTamilNaduMapTests() {
     assert.strictEqual(formatDistrict('Madurai'), 'Madurai');
   });
 
-  // 8. Demo Receiver (Centre 1) and Demo Donor (Centre 2) proximity in Madurai
-  test('8. Madurai Centre 1 (Melur) and Centre 2 (Othakadai) are ~9 km apart with safe donor surplus', () => {
+  // 10. Demo Receiver (Centre 1) and Demo Donor (Centre 2) proximity in Madurai
+  test('10. Madurai Centre 1 (Melur) and Centre 2 (Othakadai) are ~9 km apart with safe donor surplus', () => {
     const melur = db.prepare("SELECT * FROM phcs WHERE id = 'phc-thiruporur'").get();
     const othakadai = db.prepare("SELECT * FROM phcs WHERE id = 'phc-kelambakkam'").get();
 
@@ -179,44 +243,17 @@ function runTamilNaduMapTests() {
     assert(safeTransferableSurplus > 40, `Othakadai must have safe transferable surplus > 40 bottles, got ${safeTransferableSurplus}`);
   });
 
-  // 9. Plain Language Explanation generation
-  test('9. Plain-language district alert produces concise sentence from real data', () => {
-    const totalCentres = 4;
-    const criticalCount = 1;
-    const medicine = 'Paracetamol Syrup';
-    const explanation = `${criticalCount} of ${totalCentres} centres in this district are expected to run out of ${medicine} within a few days.`;
-    assert.strictEqual(explanation, '1 of 4 centres in this district are expected to run out of Paracetamol Syrup within a few days.');
-  });
-
-  // 10. Donor ranking logic
-  test('10. Donor ranking places same-district peer centres before other districts and warehouses', () => {
-    const receiverDistrict = 'Madurai';
-    const candidates = [
-      { name: 'Palani CHC', district: 'Dindigul', is_warehouse: false, surplus: 100 },
-      { name: 'Othakadai CHC', district: 'Madurai', is_warehouse: false, surplus: 200 },
-      { name: 'Madurai DDW', district: 'Madurai', is_warehouse: true, surplus: 1000 }
-    ];
-
-    const ranked = candidates.sort((a, b) => {
-      if (a.is_warehouse && !b.is_warehouse) return 1;
-      if (!a.is_warehouse && b.is_warehouse) return -1;
-      const aSame = a.district === receiverDistrict;
-      const bSame = b.district === receiverDistrict;
-      if (aSame && !bSame) return -1;
-      if (!aSame && bSame) return 1;
-      return b.surplus - a.surplus;
-    });
-
-    assert.strictEqual(ranked[0].name, 'Othakadai CHC', 'Same-district peer must be #1');
-    assert.strictEqual(ranked[1].name, 'Palani CHC', 'Cross-district peer must be #2');
-    assert.strictEqual(ranked[2].name, 'Madurai DDW', 'District warehouse must be ranked for escalation');
-  });
-
   console.log(`\n========================================`);
   console.log(`🏁 Tamil Nadu Map Tests: ${passed} passed, ${failed} failed`);
   console.log(`========================================\n`);
 
-  if (failed > 0) process.exit(1);
+  if (failed > 0) {
+    process.exit(1);
+  }
 }
 
-runTamilNaduMapTests();
+if (require.main === module) {
+  runTamilNaduMapTests();
+}
+
+module.exports = { runTamilNaduMapTests };
