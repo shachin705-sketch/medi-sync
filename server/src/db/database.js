@@ -13,6 +13,7 @@ const db = new DatabaseSync(dbPath);
 // Enable WAL mode for better concurrency and foreign keys
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
+db.exec('PRAGMA busy_timeout = 5000;');
 
 // Initialize schema
 function initSchema() {
@@ -38,7 +39,15 @@ function initSchema() {
     'ALTER TABLE current_stock ADD COLUMN min_safety_stock INTEGER DEFAULT 14;',
     'ALTER TABLE current_stock ADD COLUMN avg_daily_usage REAL DEFAULT 5;',
     'ALTER TABLE phcs ADD COLUMN facility_type TEXT DEFAULT "PHC";',
-    'ALTER TABLE phcs ADD COLUMN is_warehouse INTEGER DEFAULT 0;'
+    'ALTER TABLE phcs ADD COLUMN is_warehouse INTEGER DEFAULT 0;',
+    'ALTER TABLE transfer_requests ADD COLUMN lifecycle_stage TEXT DEFAULT "REQUESTED";',
+    'ALTER TABLE transfer_requests ADD COLUMN policy_applied TEXT DEFAULT "MANUAL";',
+    'ALTER TABLE transfer_requests ADD COLUMN is_auto_approved INTEGER DEFAULT 0;',
+    'ALTER TABLE transfer_requests ADD COLUMN warehouse_escalated INTEGER DEFAULT 0;',
+    'ALTER TABLE transfer_requests ADD COLUMN discrepancy_quantity INTEGER DEFAULT 0;',
+    'ALTER TABLE transfer_requests ADD COLUMN is_overdue_approval INTEGER DEFAULT 0;',
+    'ALTER TABLE transfer_requests ADD COLUMN is_overdue_transit INTEGER DEFAULT 0;',
+    'ALTER TABLE transfer_requests ADD COLUMN auto_generated INTEGER DEFAULT 0;'
   ];
   additiveCols.forEach(cmd => {
     try { db.exec(cmd); } catch (e) {}
@@ -46,6 +55,11 @@ function initSchema() {
 
   // Additional support tables
   try {
+    db.prepare(`
+      INSERT OR IGNORE INTO users (id, name, email, password_hash, role)
+      VALUES ('usr-system-automation', 'MediAlert AI Automation Engine', 'automation@medsync.gov.in', 'sys_hash', 'district_admin')
+    `).run();
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS application_settings (
         key TEXT PRIMARY KEY,
@@ -53,6 +67,65 @@ function initSchema() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Seed default automation settings if not present
+    const defaultSettings = [
+      ['approval_policy', 'AUTO'],
+      ['automation_interval_seconds', '30'],
+      ['safety_reserve_days', '14'],
+      ['target_buffer_days', '30'],
+      ['max_auto_approve_qty', '200'],
+      ['overdue_approval_hours', '24'],
+      ['overdue_transit_hours', '48']
+    ];
+    const insertSetting = db.prepare('INSERT OR IGNORE INTO application_settings (key, value) VALUES (?, ?)');
+    defaultSettings.forEach(([k, v]) => insertSetting.run(k, v));
+
+    // Stock reservations table for locking donor surplus
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS stock_reservations (
+        id TEXT PRIMARY KEY,
+        requisition_id TEXT NOT NULL,
+        phc_id TEXT NOT NULL,
+        medicine_id TEXT NOT NULL,
+        batch_number TEXT NOT NULL,
+        reserved_quantity INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'RESERVED' CHECK(status IN ('RESERVED', 'COMMITTED', 'RELEASED')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(phc_id) REFERENCES phcs(id),
+        FOREIGN KEY(medicine_id) REFERENCES medicines(id)
+      );
+    `);
+
+    // Background jobs execution logging
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS background_jobs (
+        id TEXT PRIMARY KEY,
+        job_name TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('SUCCESS', 'FAILED', 'RUNNING')),
+        items_processed INTEGER DEFAULT 0,
+        message TEXT,
+        duration_ms INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Persistent in-app notifications table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY,
+        phc_id TEXT,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'info' CHECK(severity IN ('critical', 'warning', 'info', 'success')),
+        category TEXT NOT NULL CHECK(category IN ('shortage', 'low_stock', 'requisition', 'approval', 'reservation', 'dispatch', 'receipt', 'escalation', 'near_expiry', 'offline_sync', 'system')),
+        link TEXT,
+        read_status INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS transfer_recommendations (
         id TEXT PRIMARY KEY,

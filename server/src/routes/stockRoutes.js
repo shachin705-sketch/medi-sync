@@ -84,6 +84,13 @@ router.post('/entry', requireAuth, (req, res) => {
       notes
     });
 
+    try {
+      const { runFullAutomationCycle } = require('../services/automationEngine');
+      runFullAutomationCycle();
+    } catch (e) {
+      console.error('Automation cycle trigger error:', e);
+    }
+
     res.status(201).json(result);
   } catch (err) {
     console.error('Stock entry record error:', err);

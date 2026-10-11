@@ -7,7 +7,8 @@ function logAudit({ userId, action, entityType, entityId, details, ipAddress = '
       INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, details, ip_address, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `);
-    stmt.run(id, userId, action, entityType, entityId, details, ipAddress);
+    const detailsStr = typeof details === 'object' && details !== null ? JSON.stringify(details) : (details !== undefined ? String(details) : null);
+    stmt.run(id, userId, action, entityType, entityId, detailsStr, ipAddress);
   } catch (err) {
     console.error('Audit log failed:', err);
   }

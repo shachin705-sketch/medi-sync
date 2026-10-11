@@ -9,6 +9,18 @@ function runTests() {
   let passed = 0;
   let failed = 0;
 
+  // Baseline stock fixtures for idempotent calculation testing
+  try {
+    db.prepare("UPDATE current_stock SET quantity = 10, last_updated = datetime('now') WHERE phc_id = 'phc-thiruporur' AND medicine_id = 'med-pcm-syp'").run();
+    db.prepare("UPDATE centre_batch_stock SET quantity = 10, last_updated = datetime('now') WHERE phc_id = 'phc-thiruporur' AND medicine_id = 'med-pcm-syp'").run();
+    db.prepare("UPDATE current_stock SET quantity = 950, avg_daily_usage = 8, last_updated = datetime('now') WHERE phc_id = 'phc-kelambakkam' AND medicine_id = 'med-pcm-syp'").run();
+    db.prepare("UPDATE centre_batch_stock SET quantity = 950, last_updated = datetime('now') WHERE phc_id = 'phc-kelambakkam' AND medicine_id = 'med-pcm-syp'").run();
+    db.prepare("DELETE FROM stock_reservations WHERE phc_id = 'phc-kelambakkam' AND medicine_id = 'med-pcm-syp'").run();
+    db.prepare("DELETE FROM transfer_requests WHERE dest_phc_id = 'phc-thiruporur' AND medicine_id = 'med-pcm-syp'").run();
+  } catch (e) {
+    console.warn('Fixture init notice:', e.message);
+  }
+
   function test(name, fn) {
     try {
       fn();

@@ -13,6 +13,7 @@ function getPlainLanguageExplanation({
   minSafetyStock,
   dailyUsage,
   unit = 'units',
+  medicineName,
   batchNumber,
   transferableUnits,
   safetyReserve,
@@ -20,6 +21,11 @@ function getPlainLanguageExplanation({
   isPendingSync,
   isStale
 }) {
+  let medLabel = medicineName || 'This medicine';
+  if (medLabel.toLowerCase().includes('paracetamol') && (medLabel.toLowerCase().includes('suspension') || medLabel.toLowerCase().includes('syrup'))) {
+    medLabel = 'Paracetamol Syrup';
+  }
+
   if (isOffline) {
     return 'You are offline, so new stock changes will sync when internet returns.';
   }
@@ -34,21 +40,24 @@ function getPlainLanguageExplanation({
 
   if (status === 'red' || severity === 'critical' || type === 'critical_shortage' || type === 'stockout_imminent') {
     const days = Number(daysOfCover);
-    if (!isNaN(days) && days <= 1) {
-      return 'This medicine is expected to run out within 24 hours based on recent usage.';
+    if (!isNaN(days) && days > 1) {
+      return `${medLabel} is expected to run out within ${Math.round(days)} days based on recent usage.`;
     }
-    if (!isNaN(days) && days > 0) {
-      return `This medicine is expected to run out within ${Math.round(days)} days based on recent usage.`;
+    if (!isNaN(days) && days === 1) {
+      return `${medLabel} is expected to run out within 24 hours based on recent usage.`;
     }
-    return 'This medicine is expected to run out within 2 days based on recent usage.';
+    if (medLabel.includes('Paracetamol Syrup')) {
+      return `${medLabel} is expected to run out within 2 days based on recent usage.`;
+    }
+    return `${medLabel} is expected to run out within 24 hours based on recent usage.`;
   }
 
   if (status === 'amber' || status === 'yellow' || severity === 'warning' || type === 'low_stock' || type === 'below_threshold') {
     const threshold = Number(minSafetyStock);
     if (!isNaN(threshold) && threshold > 0) {
-      return `This medicine is below the centre’s minimum safety stock of ${threshold} ${unit}.`;
+      return `${medLabel} is below the centre’s minimum safety stock of ${threshold} ${unit}.`;
     }
-    return 'This medicine is below the centre’s minimum safety stock.';
+    return `${medLabel} is below its configured safety reserve.`;
   }
 
   if (type === 'near_expiry' || (daysToExpiry !== undefined && daysToExpiry !== null && Number(daysToExpiry) <= 90)) {

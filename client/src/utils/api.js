@@ -370,5 +370,54 @@ export const api = {
   getDashboardSummary: async () => {
     const res = await fetch(`${API_BASE}/dashboard/summary`);
     return res.json();
+  },
+
+  // Automation & Redistribution Engine
+  getAutomationStatus: async () => {
+    const res = await fetch(`${API_BASE}/automation/status`);
+    return res.json();
+  },
+
+  triggerAutomationCycle: async () => {
+    const res = await fetch(`${API_BASE}/automation/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.json();
+  },
+
+  updateAutomationPolicy: async (policy) => {
+    const res = await fetch(`${API_BASE}/automation/policy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ policy })
+    });
+    return res.json();
+  },
+
+  getAutomationNotifications: async (limit = 50) => {
+    const res = await fetch(`${API_BASE}/automation/notifications?limit=${limit}`);
+    return res.json();
+  },
+
+  markAllNotificationsRead: async () => {
+    const res = await fetch(`${API_BASE}/automation/notifications/mark-all-read`, {
+      method: 'POST'
+    });
+    return res.json();
+  },
+
+  getAutomationReservations: async () => {
+    const res = await fetch(`${API_BASE}/automation/reservations`);
+    return res.json();
+  },
+
+  executeTransferAction: async (actionData) => {
+    const res = await fetch(`${API_BASE}/automation/transfer-action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(actionData)
+    });
+    return res.json();
   }
 };

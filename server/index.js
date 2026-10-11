@@ -26,6 +26,8 @@ const publicRoutes = require('./src/routes/publicRoutes');
 const auditRoutes = require('./src/routes/auditRoutes');
 const billingRoutes = require('./src/routes/billingRoutes');
 const districtsRoutes = require('./src/routes/districtsRoutes');
+const automationRoutes = require('./src/routes/automationRoutes');
+const { startAutomationEngine } = require('./src/services/automationEngine');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +52,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/centres', centresRoutes);
 app.use('/api/districts', districtsRoutes);
+app.use('/api/automation', automationRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/batches', batchesRoutes);
@@ -80,6 +83,8 @@ if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`🚀 MediSync PHC Backend running at http://localhost:${PORT}`);
     console.log(`🏥 Tamil Nadu PHC Medicine Stock Monitoring & Redistribution Service online.`);
+    // Start background automation engine
+    startAutomationEngine(30000);
   });
 }
 

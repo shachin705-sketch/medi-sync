@@ -3,7 +3,8 @@ import {
   LayoutDashboard, Building2, Package, Sparkles, Sliders, CheckSquare,
   Truck, ChartNoAxesCombined, FileText, Settings, Bell, Search, Filter,
   ArrowUpDown, Printer, Check, AlertTriangle, ShieldCheck, Clock,
-  ArrowRight, ArrowLeft, Plus, ChevronRight, Eye, RefreshCw, X, Download, Shield, Layers
+  ArrowRight, ArrowLeft, Plus, ChevronRight, Eye, RefreshCw, X, Download, Shield, Layers,
+  Zap, Lock, Building, CheckCircle2, Cpu
 } from 'lucide-react';
 import SurplusMap from '../components/SurplusMap';
 import CentreInventoryDrawer from '../components/CentreInventoryDrawer';
@@ -17,6 +18,9 @@ import AlertsView from '../components/AlertsView';
 import OpeningStockModal from '../components/OpeningStockModal';
 import MedicineBillingModal from '../components/MedicineBillingModal';
 import ConflictResolutionModal from '../components/ConflictResolutionModal';
+import AutomationEngineBar from '../components/AutomationEngineBar';
+import StockReservationsModal from '../components/StockReservationsModal';
+import InAppNotificationsDrawer from '../components/InAppNotificationsDrawer';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { getPlainLanguageExplanation } from '../utils/plainLanguageAlerts';
 import { clearOfflineDataOnSignOut } from '../utils/offlineDb';
@@ -291,6 +295,41 @@ const initialDispensingData = [
   }
 ];
 
+function normalizeBackendTransfer(t) {
+  const fromCode = Object.keys(codeToPhcId).find(k => codeToPhcId[k] === t.source_phc_id) || 'B';
+  const toCode = Object.keys(codeToPhcId).find(k => codeToPhcId[k] === t.dest_phc_id) || 'A';
+
+  const formattedStatus = t.status === 'in_transit' ? 'In Transit'
+    : t.status === 'approved' ? 'Approved'
+    : t.status === 'completed' ? 'Completed'
+    : t.status === 'rejected' ? 'Rejected'
+    : 'Requested';
+
+  return {
+    id: t.req_number || t.id,
+    from: t.source_phc_name || t.source_phc_id,
+    fromCode,
+    to: t.dest_phc_name || t.dest_phc_id,
+    toCode,
+    medicine: t.medicine_name || 'Essential Medicine',
+    qty: t.approved_quantity || t.quantity,
+    requested_qty: t.quantity,
+    status: formattedStatus,
+    lifecycle_stage: t.lifecycle_stage || (t.status === 'approved' ? 'RESERVED' : t.status.toUpperCase()),
+    policy_applied: t.policy_applied || 'AUTO',
+    is_auto_approved: t.is_auto_approved === 1,
+    auto_generated: t.auto_generated === 1,
+    warehouse_escalated: t.warehouse_escalated === 1,
+    discrepancy_quantity: t.discrepancy_quantity || 0,
+    reason: t.reason,
+    fefoBatch: t.fefo_batch_number ? `${t.fefo_batch_number} (Exp: ${t.fefo_expiry_date || '2027'})` : 'TN-BATCH-STD',
+    fefo_batch_number: t.fefo_batch_number,
+    fefo_expiry_date: t.fefo_expiry_date,
+    distance: 9.0,
+    createdAt: t.created_at ? new Date(t.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'
+  };
+}
+
 export default function DemoApp() {
   // Navigation State (10 Master Prompt Sections)
   const [activeNav, setActiveNav] = useState('Dashboard');
@@ -312,6 +351,109 @@ export default function DemoApp() {
   const [recentDispensingList, setRecentDispensingList] = useState(initialDispensingData);
   const [simulatedDay, setSimulatedDay] = useState(1);
   const [mapMode, setMapMode] = useState('tiles');
+
+  // Automation Engine & In-App Notification States
+  const [automationStatus, setAutomationStatus] = useState({
+    engine_status: 'ACTIVE',
+    approval_policy: 'AUTO',
+    interval_seconds: 30,
+    last_run: 'Just now',
+    metrics: {
+      active_reservations: 0,
+      total_auto_requisitions: 0,
+      auto_approved_count: 0,
+      awaiting_approval_count: 0,
+      warehouse_escalated_count: 0,
+      unread_notifications_count: 0
+    }
+  });
+  const [isAutomationLoading, setIsAutomationLoading] = useState(false);
+  const [inAppNotifications, setInAppNotifications] = useState([]);
+  const [isNotificationsDrawerOpen, setIsNotificationsDrawerOpen] = useState(false);
+  const [isReservationsModalOpen, setIsReservationsModalOpen] = useState(false);
+  const [stockReservationsList, setStockReservationsList] = useState([]);
+  const [automationFeedbackToast, setAutomationFeedbackToast] = useState(null);
+
+  // Load automation telemetry, notifications, and real persistent transfers
+  const loadAutomationData = async () => {
+    try {
+      const [statusRes, notifRes, transRes] = await Promise.allSettled([
+        api.getAutomationStatus(),
+        api.getAutomationNotifications(50),
+        fetch('/api/transfers').then(r => r.json())
+      ]);
+
+      if (statusRes.status === 'fulfilled' && statusRes.value?.success) {
+        setAutomationStatus(statusRes.value.data);
+      }
+      if (notifRes.status === 'fulfilled' && notifRes.value?.success) {
+        setInAppNotifications(notifRes.value.data || []);
+      }
+      if (transRes.status === 'fulfilled' && Array.isArray(transRes.value) && transRes.value.length > 0) {
+        const normalized = transRes.value.map(normalizeBackendTransfer);
+        setTransfers(normalized);
+      }
+    } catch (err) {
+      console.error('Error fetching live automation state:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadAutomationData();
+    const interval = setInterval(loadAutomationData, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handlePolicyChange = async (newPolicy) => {
+    try {
+      const res = await api.updateAutomationPolicy(newPolicy);
+      if (res.success) {
+        setAutomationFeedbackToast(`Approval policy updated to ${newPolicy === 'AUTO' ? 'Policy A (Fully Automated Approval)' : 'Policy B (Human Approval Required)'}`);
+        setTimeout(() => setAutomationFeedbackToast(null), 5000);
+        await loadAutomationData();
+      }
+    } catch (err) {
+      console.error('Error updating policy:', err);
+    }
+  };
+
+  const handleTriggerAutomationCycle = async () => {
+    setIsAutomationLoading(true);
+    try {
+      const res = await api.triggerAutomationCycle();
+      if (res.success) {
+        setAutomationFeedbackToast('Automation cycle executed: stock runways evaluated, FEFO batches ranked, and state machines updated.');
+        setTimeout(() => setAutomationFeedbackToast(null), 5000);
+        await loadAutomationData();
+      }
+    } catch (err) {
+      console.error('Error running cycle:', err);
+    } finally {
+      setIsAutomationLoading(false);
+    }
+  };
+
+  const handleOpenReservations = async () => {
+    try {
+      const res = await api.getAutomationReservations();
+      if (res.success) {
+        setStockReservationsList(res.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching reservations:', err);
+    }
+    setIsReservationsModalOpen(true);
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    try {
+      await api.markAllNotificationsRead();
+      setInAppNotifications(prev => prev.map(n => ({ ...n, read_status: 1 })));
+      loadAutomationData();
+    } catch (err) {
+      console.error('Error marking notifications read:', err);
+    }
+  };
 
   // Inventory Screen Specific States
   const [inventoryActiveSubtab, setInventoryActiveSubtab] = useState('inventory'); // 'inventory' | 'movements'
@@ -507,7 +649,20 @@ export default function DemoApp() {
   };
 
   // SECTION 4: Donor Approves, Adjusts, or Rejects
-  const handleApprovalDecision = ({ id, status, approved_quantity, rejection_reason, notes }) => {
+  const handleApprovalDecision = async ({ id, status, approved_quantity, rejection_reason, notes }) => {
+    try {
+      await api.executeTransferAction({
+        requisitionId: id,
+        action: status === 'rejected' ? 'REJECT' : 'APPROVE',
+        quantity: approved_quantity,
+        rejectionReason: rejection_reason,
+        actorName: selectedRole || 'Medical Officer'
+      });
+      loadAutomationData();
+    } catch (e) {
+      console.error('Error executing approval action on backend:', e);
+    }
+
     setTransfers((prev) =>
       prev.map((t) => {
         if (t.id === id) {
@@ -531,7 +686,18 @@ export default function DemoApp() {
   };
 
   // SECTION 6: Record Handover & Dispatch (Deducts Donor Stock Atomically)
-  const handleDispatch = ({ id, collection_details }) => {
+  const handleDispatch = async ({ id, collection_details }) => {
+    try {
+      await api.executeTransferAction({
+        requisitionId: id,
+        action: 'DISPATCH',
+        actorName: collection_details?.driver_name || 'Driver Kumaran (TN-19-G-4402)'
+      });
+      loadAutomationData();
+    } catch (e) {
+      console.error('Error executing dispatch action on backend:', e);
+    }
+
     setTransfers((prev) =>
       prev.map((t) => {
         if (t.id === id) {
@@ -565,7 +731,20 @@ export default function DemoApp() {
   };
 
   // SECTION 6: Confirm Delivery Receipt (Adds to Recipient Stock Atomically)
-  const handleReceipt = ({ id, receipt_confirmed_by, received_quantity, discrepancy_reason }) => {
+  const handleReceipt = async ({ id, receipt_confirmed_by, received_quantity, discrepancy_reason }) => {
+    try {
+      await api.executeTransferAction({
+        requisitionId: id,
+        action: 'RECEIVE',
+        receivedQuantity: received_quantity,
+        discrepancyReason: discrepancy_reason,
+        actorName: receipt_confirmed_by || 'Staff Pharmacist'
+      });
+      loadAutomationData();
+    } catch (e) {
+      console.error('Error executing receipt action on backend:', e);
+    }
+
     setTransfers((prev) =>
       prev.map((t) => {
         if (t.id === id) {
@@ -996,14 +1175,14 @@ export default function DemoApp() {
 
             {/* Notifications Bell */}
             <button
-              onClick={() => setActiveNav('Approvals')}
-              className="relative rounded-full border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50"
+              onClick={() => setIsNotificationsDrawerOpen(true)}
+              className="relative rounded-full border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 cursor-pointer transition shadow-2xs"
               title="View in-app alerts and transfer notifications"
             >
               <Bell size={16} />
-              {alerts.filter((a) => a.status === 'new').length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#D62839] text-[9px] font-bold text-white">
-                  {alerts.filter((a) => a.status === 'new').length}
+              {(inAppNotifications.filter((n) => !n.read_status).length > 0 || alerts.filter((a) => a.status === 'new').length > 0) && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#D62839] text-[9px] font-bold text-white shadow-xs animate-pulse">
+                  {inAppNotifications.filter((n) => !n.read_status).length || alerts.filter((a) => a.status === 'new').length}
                 </span>
               )}
             </button>
@@ -1079,6 +1258,28 @@ export default function DemoApp() {
           {/* ===================================================================== */}
           {activeNav === 'Dashboard' && (
             <div className="space-y-6">
+              {/* Automation Feedback Toast */}
+              {automationFeedbackToast && (
+                <div className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-xs text-teal-900 flex items-center justify-between gap-2 shadow-2xs animate-in fade-in">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <Zap size={16} className="text-[#0B6E6E]" />
+                    <span>{automationFeedbackToast}</span>
+                  </div>
+                  <button onClick={() => setAutomationFeedbackToast(null)} className="text-teal-700 hover:text-teal-900 cursor-pointer">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* AUTONOMOUS REDISTRIBUTION ENGINE TELEMETRY BAR */}
+              <AutomationEngineBar
+                statusData={automationStatus}
+                onPolicyChange={handlePolicyChange}
+                onTriggerCycle={handleTriggerAutomationCycle}
+                onOpenReservations={handleOpenReservations}
+                isLoading={isAutomationLoading}
+              />
+
               {/* 1. SUMMARY METRICS (Section 1) */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
@@ -1636,7 +1837,7 @@ export default function DemoApp() {
                       <th className="py-3 px-4">Type</th>
                       <th className="py-3 px-4">Usable Stock</th>
                       <th className="py-3 px-4">Days Cover</th>
-                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Status &amp; Lifecycle</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -2088,39 +2289,87 @@ export default function DemoApp() {
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {transfers.map((t) => (
                       <tr key={t.id} className="hover:bg-slate-50">
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-700">{t.id}</td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-slate-700">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{t.id}</span>
+                            {t.auto_generated && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-teal-100 text-teal-800" title="Automatically generated by redistribution engine">
+                                <Zap size={10} /> Auto
+                              </span>
+                            )}
+                            {t.warehouse_escalated && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-indigo-100 text-indigo-800" title="Escalated to District Drug Warehouse (DDW)">
+                                <Building size={10} /> DDW
+                              </span>
+                            )}
+                          </div>
+                          {t.policy_applied && (
+                            <div className="text-[10px] mt-0.5 font-sans font-medium">
+                              {t.policy_applied === 'AUTO' ? (
+                                <span className="text-emerald-600 font-semibold flex items-center gap-0.5">
+                                  <CheckCircle2 size={10} /> Policy A (Auto)
+                                </span>
+                              ) : (
+                                <span className="text-amber-700 font-semibold flex items-center gap-0.5">
+                                  <Lock size={10} /> Policy B (Human)
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </td>
                         <td className="py-3.5 px-4 font-bold text-slate-900">{t.to}</td>
-                        <td className="py-3.5 px-4 text-slate-700">{t.from}</td>
+                        <td className="py-3.5 px-4 text-slate-700">
+                          <div>{t.from}</div>
+                          {t.warehouse_escalated && (
+                            <div className="text-[10px] text-indigo-600 font-semibold">District Warehouse Facility</div>
+                          )}
+                        </td>
                         <td className="py-3.5 px-4">
                           <span className="font-extrabold text-slate-900">{t.qty} units</span>
                           <div className="text-[10px] text-slate-500">{t.medicine}</div>
                         </td>
                         <td className="py-3.5 px-4 font-mono text-[11px] text-teal font-semibold">{t.fefoBatch}</td>
                         <td className="py-3.5 px-4">
-                          <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
-                            t.status === 'Requested'
-                              ? 'bg-amber-100 text-amber-800'
-                              : t.status === 'Approved'
-                              ? 'bg-blue-100 text-blue-800'
-                              : t.status === 'In Transit'
-                              ? 'bg-purple-100 text-purple-800'
-                              : t.status === 'Rejected'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}>
-                            {t.status}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
+                              t.status === 'Requested'
+                                ? 'bg-amber-100 text-amber-800'
+                                : t.status === 'Approved'
+                                ? 'bg-blue-100 text-blue-800'
+                                : t.status === 'In Transit'
+                                ? 'bg-purple-100 text-purple-800'
+                                : t.status === 'Rejected'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {t.status}
+                            </span>
+                            {t.is_auto_approved && (
+                              <span className="px-2 py-0.5 rounded-full font-bold text-[9px] bg-teal-50 text-teal-700 border border-teal-200">
+                                Auto-Approved
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 flex items-center gap-1 text-[9px] font-mono text-slate-400">
+                            <span className="font-semibold text-slate-500">Stage:</span>
+                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-800 font-bold border border-slate-200">
+                              {t.lifecycle_stage || t.status?.toUpperCase()}
+                            </span>
+                          </div>
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           {t.status === 'Requested' ? (
                             <button
                               onClick={() => setApprovalModalTransfer(t)}
-                              className="rounded-full bg-[#0B6E6E] px-3.5 py-1.5 font-bold text-white hover:bg-[#095959] shadow-2xs"
+                              className="rounded-full bg-[#0B6E6E] px-3.5 py-1.5 font-bold text-white hover:bg-[#095959] shadow-2xs cursor-pointer"
                             >
                               Review &amp; Approve
                             </button>
                           ) : (
-                            <span className="text-[11px] text-slate-400 font-semibold">Processed</span>
+                            <div className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              <Check size={12} />
+                              <span>Processed</span>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -2586,6 +2835,26 @@ export default function DemoApp() {
           onReconcile={offlineSync.reconcileConflict}
         />
       )}
+
+      {/* Modal: Active Stock Reservations (Double-Allocation Prevention) */}
+      <StockReservationsModal
+        isOpen={isReservationsModalOpen}
+        onClose={() => setIsReservationsModalOpen(false)}
+        reservations={stockReservationsList}
+      />
+
+      {/* Drawer: In-App Automation Notifications */}
+      <InAppNotificationsDrawer
+        isOpen={isNotificationsDrawerOpen}
+        onClose={() => setIsNotificationsDrawerOpen(false)}
+        notifications={inAppNotifications}
+        onMarkAllRead={handleMarkAllNotificationsRead}
+        onNotificationClick={(n) => {
+          if (n.requisition_id) {
+            setActiveNav('Approvals');
+          }
+        }}
+      />
     </div>
   );
 }

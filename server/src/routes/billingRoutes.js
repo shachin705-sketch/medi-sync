@@ -9,6 +9,7 @@ const {
   getBillById,
   listBills
 } = require('../services/billingService');
+const { runFullAutomationCycle } = require('../services/automationEngine');
 
 /**
  * GET /api/billing
@@ -83,6 +84,7 @@ router.post('/:id/confirm', (req, res) => {
   const { confirmed_by, idempotency_key } = req.body;
   try {
     const confirmedBill = confirmBillDispense(req.params.id, { confirmed_by, idempotency_key });
+    try { runFullAutomationCycle(); } catch (e) { console.error('Automation cycle trigger error:', e); }
     res.json({
       message: 'Medicine dispensing confirmed. Batch inventory and stock ledger updated.',
       bill: confirmedBill
